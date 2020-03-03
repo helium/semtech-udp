@@ -29,7 +29,7 @@ impl stdError for Error {
         }
     }
 
-    fn cause(&self) -> Option<&stdError> {
+    fn cause(&self) -> Option<&dyn stdError> {
         // Generic error, underlying cause isn't tracked.
         None
     }
