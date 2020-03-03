@@ -8,19 +8,19 @@
 ///
 #[macro_use]
 extern crate arrayref;
-use std::error::Error as stdError;
 use mio::net::UdpSocket;
 use mio::{Events, Poll, PollOpt, Ready, Token};
-use std::time::Duration;
 use num_enum::TryFromPrimitive;
 use std::convert::TryFrom;
+use std::error::Error as stdError;
 use std::fmt;
+use std::time::Duration;
 mod error;
-pub use error::Error as Error;
+pub use error::Error;
 use serde_json::Value;
 
 mod util;
-use util::{parse_u64_field, parse_f64_field,parse_string_field, parse_i64_field};
+use util::{parse_f64_field, parse_i64_field, parse_string_field, parse_u64_field};
 const SENDER: Token = Token(0);
 const ECHOER: Token = Token(1);
 
@@ -28,10 +28,10 @@ const PROTOCOL_VERSION: u8 = 2;
 
 type Result<T> = std::result::Result<T, Box<stdError>>;
 
- // 0      | protocol version = 2
- // 1-2    | random token
- // 3      | PULL_DATA identifier 0x02
- // 4-11   | Gateway unique identifier (MAC address)
+// 0      | protocol version = 2
+// 1-2    | random token
+// 3      | PULL_DATA identifier 0x02
+// 4-11   | Gateway unique identifier (MAC address)
 #[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
 #[repr(u8)]
 enum Identifier {
@@ -47,11 +47,9 @@ struct MacAddress {
 }
 
 impl MacAddress {
-    pub fn new(b: &[u8; 6]) -> MacAddress{
+    pub fn new(b: &[u8; 6]) -> MacAddress {
         MacAddress {
-            bytes: [
-                b[0], b[1], b[2], b[3], b[4], b[5]
-            ]
+            bytes: [b[0], b[1], b[2], b[3], b[4], b[5]],
         }
     }
 }
@@ -64,7 +62,6 @@ impl fmt::Display for MacAddress {
         }
         write!(f, "{:02X}", self.bytes[5]);
         write!(f, ")")
-
     }
 }
 
@@ -84,17 +81,16 @@ struct Packet {
     tmst: u64,
 }
 
-
 impl Packet {
     pub fn from_el(el: &serde_json::value::Value) -> Packet {
-        Packet{
+        Packet {
             chan: parse_u64_field(&el, "chan"),
             codr: parse_string_field(&el, "codr"),
             data: parse_string_field(&el, "data"),
             datr: parse_string_field(&el, "datr"),
             freq: parse_f64_field(&el, "freq"),
             lsnr: parse_f64_field(&el, "lsnr"),
-            modu: parse_string_field(&el, "modu"), 
+            modu: parse_string_field(&el, "modu"),
             rfch: parse_u64_field(&el, "rfch"),
             rssi: parse_i64_field(&el, "rssi"),
             size: parse_u64_field(&el, "size"),
@@ -112,12 +108,12 @@ struct Stat {
     rxnb: u64,
     rxok: u64,
     time: String,
-    txnb: u64
+    txnb: u64,
 }
 
 impl Stat {
     pub fn from_map(map: &serde_json::value::Value) -> Stat {
-        Stat{
+        Stat {
             ackr: parse_f64_field(map, "ackr"),
             dwnb: parse_u64_field(map, "dwnb"),
             rxfw: parse_u64_field(map, "rxfw"),
@@ -130,7 +126,7 @@ impl Stat {
 }
 
 pub fn parse_gateway_rx(num_recv: usize, buffer: &mut [u8]) -> Result<()> {
-    if(buffer[0] != PROTOCOL_VERSION) {
+    if (buffer[0] != PROTOCOL_VERSION) {
         return Err(Error::InvalidProtocolVersion.into());
     }
 
@@ -141,13 +137,13 @@ pub fn parse_gateway_rx(num_recv: usize, buffer: &mut [u8]) -> Result<()> {
     if let Ok(id) = Identifier::try_from(buffer[3]) {
         match id {
             Identifier::PullData => {
-                let address = MacAddress::new(array_ref![buffer,4,6]);
+                let address = MacAddress::new(array_ref![buffer, 4, 6]);
                 print!("PullData: ");
                 println!("{:}", address);
-            },
+            }
             Identifier::PushData => {
                 print!("PushData: ");
-                let address = MacAddress::new(array_ref![buffer,4,6]);
+                let address = MacAddress::new(array_ref![buffer, 4, 6]);
                 if let Ok(json_str) = std::str::from_utf8(&buffer[12..num_recv]) {
                     let v: Value = serde_json::from_str(json_str)?;
                     println!("v = {:?}", v);
@@ -157,7 +153,7 @@ pub fn parse_gateway_rx(num_recv: usize, buffer: &mut [u8]) -> Result<()> {
                             for pkt in rxpk {
                                 println!("{:?}", Packet::from_el(pkt));
                             }
-                        },
+                        }
                         _ => (),
                     };
 
@@ -166,11 +162,11 @@ pub fn parse_gateway_rx(num_recv: usize, buffer: &mut [u8]) -> Result<()> {
                             let stat = Stat::from_map(&v["stat"]);
                             println!("{:?}", stat);
                             //
-                        },
+                        }
                         _ => (),
                     };
                 }
-            },
+            }
             Identifier::PullResp => {
                 print!("PullResp: ");
                 if let Ok(json_str) = std::str::from_utf8(&buffer[4..num_recv]) {
@@ -179,17 +175,16 @@ pub fn parse_gateway_rx(num_recv: usize, buffer: &mut [u8]) -> Result<()> {
                 } else {
                     println!("PullResp:bad parsing!");
                 }
-            },
+            }
             Identifier::PullAck => {
                 println!("PullAck");
                 // assert not larger than 4
-            },
+            }
             Identifier::PushAck => {
                 println!("PushAck");
                 // assert not larger than 4
-            },
+            }
         }
-   
     } else {
         return Err(Error::InvalidIdentifier.into());
     }
@@ -197,11 +192,9 @@ pub fn parse_gateway_rx(num_recv: usize, buffer: &mut [u8]) -> Result<()> {
 }
 
 pub fn run() -> Result<()> {
-
-
     //let sender_addr ="127.0.0.1:0".parse()?;
     //let mut sender_socket = UdpSocket::bind(&sender_addr)?;
-    let echoer_addr ="0.0.0.0:1680".parse()?;
+    let echoer_addr = "0.0.0.0:1680".parse()?;
     let mut echoer_socket = UdpSocket::bind(&echoer_addr)?;
     // If we do not use connect here, SENDER and ECHOER would need to call send_to and recv_from
     // respectively.
@@ -211,7 +204,12 @@ pub fn run() -> Result<()> {
     let mut poll = Poll::new()?;
     // We register our sockets here so that we can check if they are ready to be written/read.
     //poll.register(&mut sender_socket, SENDER, Ready::writable(), PollOpt::edge())?;
-    poll.register(&mut echoer_socket, ECHOER, Ready::readable(), PollOpt::level())?;
+    poll.register(
+        &mut echoer_socket,
+        ECHOER,
+        Ready::readable(),
+        PollOpt::level(),
+    )?;
     //let msg_to_send = [9; 9];
     let mut buffer = [0; 1024];
     let mut events = Events::with_capacity(128);
@@ -220,18 +218,18 @@ pub fn run() -> Result<()> {
         for event in events.iter() {
             match event.token() {
                 // Our SENDER is ready to be written into.
-                SENDER => { 
+                SENDER => {
                     // let bytes_sent = sender_socket.send(&msg_to_send)?;
                     // assert_eq!(bytes_sent, 9);
                     // println!("sent {:?} -> {:?} bytes", msg_to_send, bytes_sent);
-                },
+                }
                 // Our ECHOER is ready to be read from.
                 ECHOER => {
                     let num_recv = echoer_socket.recv(&mut buffer)?;
                     parse_gateway_rx(num_recv, &mut buffer);
                     buffer = [0; 1024];
                 }
-                _ => unreachable!()
+                _ => unreachable!(),
             }
         }
     }

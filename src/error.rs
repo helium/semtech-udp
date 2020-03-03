@@ -5,7 +5,7 @@ use std::{fmt, str};
 #[derive(Debug, Clone)]
 pub enum Error {
     InvalidProtocolVersion,
-    InvalidIdentifier
+    InvalidIdentifier,
 }
 
 impl fmt::Display for Error {
@@ -24,12 +24,8 @@ impl fmt::Display for Error {
 impl stdError for Error {
     fn description(&self) -> &str {
         match self {
-            Error::InvalidProtocolVersion => {
-                "Invalid protocol version (byte 0 in UDP frame)"
-            }
-            Error::InvalidIdentifier => {
-                "Invalid message identifier (byte 3 in UDP frame)"
-            }
+            Error::InvalidProtocolVersion => "Invalid protocol version (byte 0 in UDP frame)",
+            Error::InvalidIdentifier => "Invalid message identifier (byte 3 in UDP frame)",
         }
     }
 
