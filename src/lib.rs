@@ -44,9 +44,12 @@ impl Packet {
                     },
                     data: match id {
                         Identifier::PullData => PacketData::PullData,
-                        Identifier::PushData => PacketData::PushData(serde_json::from_str(
-                            std::str::from_utf8(&buffer[12..num_recv])?,
-                        )?),
+                        Identifier::PushData => {
+                            let json_str = std::str::from_utf8(&buffer[12..num_recv])?;
+                            println!("{:?}", json_str);
+                            PacketData::PushData(serde_json::from_str(json_str)?)
+                        }
+                        ,
                         Identifier::PullResp => PacketData::PullResp,
                         Identifier::PullAck => PacketData::PullAck,
                         Identifier::PushAck => PacketData::PushAck,
@@ -79,11 +82,9 @@ impl Packet {
         };
 
         match self.data {
+
             PacketData::PushData(data) => {
-                // must be particular about serialize fields
-                let json_string = serde_json::to_string(&data)?;
-                println!("string = {:}", json_string);
-                w.write(json_string.as_bytes())?;
+                w.write(data.as_bytes()?.as_slice());
             }
             _ => (),
         };
