@@ -1,12 +1,12 @@
 #[macro_use]
 extern crate arrayref;
-
+pub use error::Error;
 use std::convert::TryFrom;
 use std::error::Error as stdError;
+use std::io::{Cursor, Write};
+
 mod error;
-pub use error::Error;
 mod types;
-use std::io::BufWriter;
 use types::*;
 
 const PROTOCOL_VERSION: u8 = 2;
@@ -25,9 +25,6 @@ pub struct Packet {
     gateway_mac: Option<MacAddress>,
     data: PacketData,
 }
-
-use std::io::Cursor;
-use std::io::Write;
 
 impl Packet {
     pub fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Box<dyn stdError>> {
@@ -73,7 +70,7 @@ impl Packet {
             PacketData::PullData => Identifier::PullData,
             PacketData::PullResp => Identifier::PullResp,
             PacketData::PullAck => Identifier::PullAck,
-        } as u8]);
+        } as u8])?;
 
         if let Some(mac) = self.gateway_mac {
             w.write(mac.bytes())?;
