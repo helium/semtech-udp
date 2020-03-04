@@ -1,11 +1,3 @@
-/// A User Datagram Protocol socket.
-///
-/// This is an implementation of a bound UDP socket. This supports both IPv4 and
-/// IPv6 addresses, and there is no corresponding notion of a server because UDP
-/// is a datagram protocol.
-///
-/// # Examples
-///
 #[macro_use]
 extern crate arrayref;
 use mio::net::UdpSocket;
