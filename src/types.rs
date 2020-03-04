@@ -29,24 +29,28 @@ pub struct PushData {
 
 #[derive(Debug)]
 pub struct MacAddress {
-    bytes: [u8; 6],
+    bytes: [u8; 8],
 }
 
 impl MacAddress {
-    pub fn new(b: &[u8; 6]) -> MacAddress {
+    pub fn new(b: &[u8; 8]) -> MacAddress {
         MacAddress {
-            bytes: [b[0], b[1], b[2], b[3], b[4], b[5]],
+            bytes: [b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]],
         }
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
     }
 }
 
 impl fmt::Display for MacAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MacAddress(")?;
-        for i in 0..5 {
+        for i in 0..6 {
             write!(f, "{:02X}:", self.bytes[i])?;
         }
-        write!(f, "{:02X}", self.bytes[5])?;
+        write!(f, "{:02X}", self.bytes[7])?;
         write!(f, ")")
     }
 }

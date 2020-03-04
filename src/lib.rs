@@ -1,23 +1,22 @@
 #[macro_use]
 extern crate arrayref;
-use std::error::Error as stdError;
 
 use std::convert::TryFrom;
+use std::error::Error as stdError;
 mod error;
 pub use error::Error;
 mod types;
+use std::io::BufWriter;
 use types::*;
 
 const PROTOCOL_VERSION: u8 = 2;
-
-type Result<T> = std::result::Result<T, Box<dyn stdError>>;
 
 fn random_token(buffer: &[u8]) -> u16 {
     (buffer[1] as u16) << 8 | buffer[2] as u16
 }
 
 fn gateway_mac(buffer: &[u8]) -> MacAddress {
-    MacAddress::new(array_ref![buffer, 4, 6])
+    MacAddress::new(array_ref![buffer, 4, 8])
 }
 
 #[derive(Debug)]
@@ -27,8 +26,11 @@ pub struct Packet {
     data: PacketData,
 }
 
+use std::io::Cursor;
+use std::io::Write;
+
 impl Packet {
-    pub fn parse(buffer: &[u8], num_recv: usize) -> Result<Packet> {
+    pub fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Box<dyn stdError>> {
         if buffer[0] != PROTOCOL_VERSION {
             Err(Error::InvalidProtocolVersion.into())
         } else {
@@ -56,8 +58,69 @@ impl Packet {
             }
         }
     }
+
+    pub fn serialize(self, buffer: &mut [u8]) -> std::result::Result<u64, Box<dyn stdError>> {
+        let mut w = Cursor::new(buffer);
+        w.write(&[
+            PROTOCOL_VERSION,
+            (self.random_token >> 8) as u8,
+            self.random_token as u8,
+        ])?;
+
+        w.write(&[match &self.data {
+            PacketData::PushData(_) => Identifier::PushData,
+            PacketData::PushAck => Identifier::PushAck,
+            PacketData::PullData => Identifier::PullData,
+            PacketData::PullResp => Identifier::PullResp,
+            PacketData::PullAck => Identifier::PullAck,
+        } as u8]);
+
+        if let Some(mac) = self.gateway_mac {
+            w.write(mac.bytes())?;
+        };
+
+        match self.data {
+            PacketData::PushData(data) => {
+                let json_string = serde_json::to_string(&data)?;
+                w.write(json_string.as_bytes())?;
+            }
+            _ => (),
+        };
+        Ok(w.position())
+    }
 }
 
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+
+    #[test]
+    fn test_PullData() {
+        let recv = [
+            0x2, 0x9F, 0x92, 0x2, 0xAA, 0x55, 0x5A, 0x1, 0x2, 0x3, 0x4, 0x5,
+        ];
+        let packet = Packet::parse(&recv, recv.len()).unwrap();
+        println!("packet: {:?}", packet);
+        if let PacketData::PullData = packet.data {
+            assert!(true);
+        } else {
+            assert!(false);
+        }
+
+        let mut buffer = [0; 512];
+        let written = packet.serialize(&mut buffer).unwrap();
+        for i in 0..recv.len() {
+            print!("0x{:x} ", buffer[i]);
+            //assert_eq!(recv[i], buffer[i]);
+        }
+        assert_eq!(written, recv.len() as u64);
+
+        for i in 0..recv.len() {
+            assert_eq!(recv[i], buffer[i]);
+        }
+    }
+}
 /*
 [0x2, 0x5E, 0x52, 0x0, 0xAA, 0x55, 0x5A, 0x0, 0x0, 0x0, 0x0, 0x0, 0x7B, 0x22, 0x72, 0x78, 0x70, 0x6B, 0x22, 0x3A, 0x5B, 0x7B, 0x22, 0x74, 0x6D, 0x73, 0x74, 0x22, 0x3A, 0x31, 0x34, 0x37, 0x32, 0x32, 0x34, 0x32, 0x32, 0x35, 0x32, 0x2C, 0x22, 0x63, 0x68, 0x61, 0x6E, 0x22, 0x3A, 0x38, 0x2C, 0x22, 0x72, 0x66, 0x63, 0x68, 0x22, 0x3A, 0x30, 0x2C, 0x22, 0x66, 0x72, 0x65, 0x71, 0x22, 0x3A, 0x39, 0x31, 0x32, 0x2E, 0x36, 0x30, 0x30, 0x30, 0x30, 0x30, 0x2C, 0x22, 0x73, 0x74, 0x61, 0x74, 0x22, 0x3A, 0x31, 0x2C, 0x22, 0x6D, 0x6F, 0x64, 0x75, 0x22, 0x3A, 0x22, 0x4C, 0x4F, 0x52, 0x41, 0x22, 0x2C, 0x22, 0x64, 0x61, 0x74, 0x72, 0x22, 0x3A, 0x22, 0x53, 0x46, 0x38, 0x42, 0x57, 0x35, 0x30, 0x30, 0x22, 0x2C, 0x22, 0x63, 0x6F, 0x64, 0x72, 0x22, 0x3A, 0x22, 0x34, 0x2F, 0x35, 0x22, 0x2C, 0x22, 0x6C, 0x73, 0x6E, 0x72, 0x22, 0x3A, 0x31, 0x30, 0x2E, 0x38, 0x2C, 0x22, 0x72, 0x73, 0x73, 0x69, 0x22, 0x3A, 0x2D, 0x35, 0x38, 0x2C, 0x22, 0x73, 0x69, 0x7A, 0x65, 0x22, 0x3A, 0x32, 0x33, 0x2C, 0x22, 0x64, 0x61, 0x74, 0x61, 0x22, 0x3A, 0x22, 0x41, 0x4C, 0x51, 0x41, 0x41, 0x41, 0x41, 0x42, 0x41, 0x41, 0x41, 0x41, 0x53, 0x47, 0x56, 0x73, 0x61, 0x58, 0x56, 0x74, 0x49, 0x43, 0x41, 0x30, 0x4C, 0x44, 0x59, 0x43, 0x4E, 0x72, 0x41, 0x3D, 0x22, 0x7D, 0x5D, 0x7D, ]
 Packet { random_token: 24146, gateway_mac: Some(MacAddress { bytes: [170, 85, 90, 0, 0, 0] }), data: PushData(PushData { rxpk: Some([RxPk { chan: 8, codr: "4/5", data: "ALQAAAABAAAASGVsaXVtICA0LDYCNrA=", datr: "SF8BW500", freq: 912.6, lsnr: 10.8, modu: "LORA", rfch: 0, rssi: -58, size: 23, stat: 1, tmst: 1472242252 }]), stat: None }) }
