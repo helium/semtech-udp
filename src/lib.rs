@@ -15,7 +15,6 @@ use std::error::Error as stdError;
 use std::time::Duration;
 mod error;
 pub use error::Error;
-use serde_json::Value;
 mod types;
 use types::*;
 mod util;
@@ -27,71 +26,21 @@ const PROTOCOL_VERSION: u8 = 2;
 
 type Result<T> = std::result::Result<T, Box<dyn stdError>>;
 
-pub fn parse_gateway_rx(num_recv: usize, buffer: &mut [u8]) -> Result<()> {
+pub fn parse_gateway_rx(buffer: &mut [u8], num_recv: usize) -> Result<Packet> {
     if buffer[0] != PROTOCOL_VERSION {
         return Err(Error::InvalidProtocolVersion.into());
     }
-
-    let random_token: u16 = (buffer[1] as u16) << 8 | buffer[2] as u16;
-
-    println!("Random token = {:x}", random_token);
-
     if let Ok(id) = Identifier::try_from(buffer[3]) {
-        match id {
-            Identifier::PullData => {
-                let address = MacAddress::new(array_ref![buffer, 4, 6]);
-                print!("PullData: ");
-                println!("{:}", address);
-            }
-            Identifier::PushData => {
-                print!("PushData: ");
-                let address = MacAddress::new(array_ref![buffer, 4, 6]);
-                println!("{:}", address);
-
-                if let Ok(json_str) = std::str::from_utf8(&buffer[12..num_recv]) {
-                    let v: Value = serde_json::from_str(json_str)?;
-                    match &v["rxpk"] {
-                        Value::Array(rxpk) => {
-                            print!("rxpk: ");
-                            for pkt in rxpk {
-                                println!("\t{:?}", RxPk::from_value(pkt));
-                            }
-                        }
-                        _ => (),
-                    };
-
-                    match &v["stat"] {
-                        Value::Object(_) => {
-                            let stat = Stat::from_value(&v["stat"]);
-                            println!("{:?}", stat);
-                            //
-                        }
-                        _ => (),
-                    };
-                }
-            }
-            Identifier::PullResp => {
-                print!("PullResp: ");
-                if let Ok(json_str) = std::str::from_utf8(&buffer[4..num_recv]) {
-                    let v: Value = serde_json::from_str(json_str)?;
-                    println!("{:?}", v);
-                } else {
-                    println!("PullResp:bad parsing!");
-                }
-            }
-            Identifier::PullAck => {
-                println!("PullAck");
-                // assert not larger than 4
-            }
-            Identifier::PushAck => {
-                println!("PushAck");
-                // assert not larger than 4
-            }
-        }
+        Ok(match id {
+            Identifier::PullData => Packet::PullData(PullData::new(&buffer, num_recv)?),
+            Identifier::PushData => Packet::PushData(PushData::new(&buffer, num_recv)?),
+            Identifier::PullResp => Packet::PullResp(PullResp::new(&buffer, num_recv)?),
+            Identifier::PullAck => Packet::PullAck(PullAck::new(&buffer, num_recv)?),
+            Identifier::PushAck => Packet::PushAck(PushAck::new(&buffer, num_recv)?),
+        })
     } else {
-        return Err(Error::InvalidIdentifier.into());
+        Err(Error::InvalidIdentifier.into())
     }
-    Ok(())
 }
 
 pub fn run() -> Result<()> {
@@ -129,7 +78,7 @@ pub fn run() -> Result<()> {
                 // Our ECHOER is ready to be read from.
                 ECHOER => {
                     let num_recv = echoer_socket.recv(&mut buffer)?;
-                    parse_gateway_rx(num_recv, &mut buffer)?;
+                    parse_gateway_rx(&mut buffer, num_recv)?;
                     buffer = [0; 1024];
                 }
                 _ => unreachable!(),
