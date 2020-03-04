@@ -1,5 +1,4 @@
 use std::error::Error as stdError;
-
 use std::{fmt, str};
 
 #[derive(Debug, Clone)]
