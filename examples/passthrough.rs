@@ -45,11 +45,11 @@ fn main() -> Result<()> {
                 // Our ECHOER is ready to be read from.
                 ECHOER => {
                     let num_recv = echoer_socket.recv(&mut buffer)?;
-                    // print!("[");
-                    // for i in 0..num_recv {
-                    //     print!("0x{:X}, ", buffer[i])
-                    // }
-                    // println!("]");
+                    print!("[");
+                    for i in 0..num_recv {
+                        print!("0x{:X}, ", buffer[i])
+                    }
+                    println!("]");
                     let msg = semtech_udp::Packet::parse(&mut buffer, num_recv)?;
                     println!("{:?}", msg);
                     buffer = [0; 1024];
