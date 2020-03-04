@@ -10,4 +10,5 @@ edition = "2018"
 mio = "0.6"
 num_enum = "0.4"
 arrayref = "0.3"
-serde_json = "1.0"
+serde_json = { version = "1.0" }
+serde = { version = "1.0.100", default-features = false,  features = ["derive"] }

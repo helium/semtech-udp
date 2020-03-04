@@ -1,6 +1,5 @@
-use super::util::{parse_f64_field, parse_i64_field, parse_string_field, parse_u64_field};
 use num_enum::TryFromPrimitive;
-use serde_json::Value;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use super::Result;
@@ -23,6 +22,7 @@ fn gateway_mac(buffer: &[u8]) -> MacAddress {
     MacAddress::new(array_ref![buffer, 4, 6])
 }
 
+#[derive(Debug)]
 pub enum Packet {
     PushData(PushData),
     PushAck(PushAck),
@@ -31,47 +31,30 @@ pub enum Packet {
     PullAck(PullAck),
 }
 
+#[derive(Debug)]
 pub struct PushData {
     random_token: u16,
     gateway_mac: MacAddress,
+    data: PushDataJson,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PushDataJson {
     rxpk: Option<Vec<RxPk>>,
     stat: Option<Stat>,
 }
 
 impl PushData {
     pub fn new(buffer: &[u8], num_recv: usize) -> Result<PushData> {
-        let mut rxpk: Option<Vec<RxPk>> = None;
-        let mut stat = None;
-        if let Ok(json_str) = std::str::from_utf8(&buffer[12..num_recv]) {
-            let v: Value = serde_json::from_str(json_str)?;
-            match &v["rxpk"] {
-                Value::Array(rxpk_arr) => {
-                    let mut temp = Vec::new();
-                    for pkt in rxpk_arr {
-                        temp.push(RxPk::from_value(pkt));
-                    }
-                    rxpk = Some(temp);
-                }
-                _ => (),
-            };
-
-            match &v["stat"] {
-                Value::Object(_) => {
-                    stat = Some(Stat::from_value(&v["stat"]));
-                }
-                _ => (),
-            };
-        }
-
         Ok(PushData {
             random_token: random_token(buffer),
             gateway_mac: gateway_mac(buffer),
-            rxpk,
-            stat,
+            data: serde_json::from_str(std::str::from_utf8(&buffer[12..num_recv])?)?,
         })
     }
 }
 
+#[derive(Debug)]
 pub struct PushAck {
     random_token: u16,
 }
@@ -84,6 +67,7 @@ impl PushAck {
     }
 }
 
+#[derive(Debug)]
 pub struct PullData {
     random_token: u16,
     gateway_mac: MacAddress,
@@ -98,6 +82,7 @@ impl PullData {
     }
 }
 
+#[derive(Debug)]
 pub struct PullResp {
     random_token: u16, // need json objs
 }
@@ -110,6 +95,7 @@ impl PullResp {
     }
 }
 
+#[derive(Debug)]
 pub struct PullAck {
     random_token: u16,
 }
@@ -122,6 +108,7 @@ impl PullAck {
     }
 }
 
+#[derive(Debug)]
 pub struct MacAddress {
     bytes: [u8; 6],
 }
@@ -145,7 +132,7 @@ impl fmt::Display for MacAddress {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RxPk {
     chan: u64,
     codr: String,
@@ -161,26 +148,7 @@ pub struct RxPk {
     tmst: u64,
 }
 
-impl RxPk {
-    pub fn from_value(el: &serde_json::value::Value) -> RxPk {
-        RxPk {
-            chan: parse_u64_field(&el, "chan"),
-            codr: parse_string_field(&el, "codr"),
-            data: parse_string_field(&el, "data"),
-            datr: parse_string_field(&el, "datr"),
-            freq: parse_f64_field(&el, "freq"),
-            lsnr: parse_f64_field(&el, "lsnr"),
-            modu: parse_string_field(&el, "modu"),
-            rfch: parse_u64_field(&el, "rfch"),
-            rssi: parse_i64_field(&el, "rssi"),
-            size: parse_u64_field(&el, "size"),
-            stat: parse_u64_field(&el, "stat"),
-            tmst: parse_u64_field(&el, "tmst"),
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Stat {
     ackr: f64,
     dwnb: u64,
@@ -189,18 +157,4 @@ pub struct Stat {
     rxok: u64,
     time: String,
     txnb: u64,
-}
-
-impl Stat {
-    pub fn from_value(map: &serde_json::value::Value) -> Stat {
-        Stat {
-            ackr: parse_f64_field(map, "ackr"),
-            dwnb: parse_u64_field(map, "dwnb"),
-            rxfw: parse_u64_field(map, "rxfw"),
-            rxnb: parse_u64_field(map, "rxnb"),
-            rxok: parse_u64_field(map, "rxok"),
-            time: parse_string_field(map, "time"),
-            txnb: parse_u64_field(map, "txnb"),
-        }
-    }
 }
