@@ -17,20 +17,49 @@ const PROTOCOL_VERSION: u8 = 2;
 
 type Result<T> = std::result::Result<T, Box<dyn stdError>>;
 
-pub fn parse_gateway_rx(buffer: &mut [u8], num_recv: usize) -> Result<Packet> {
-    if buffer[0] != PROTOCOL_VERSION {
-        return Err(Error::InvalidProtocolVersion.into());
-    }
-    if let Ok(id) = Identifier::try_from(buffer[3]) {
-        Ok(match id {
-            Identifier::PullData => Packet::PullData(PullData::new(&buffer, num_recv)?),
-            Identifier::PushData => Packet::PushData(PushData::new(&buffer, num_recv)?),
-            Identifier::PullResp => Packet::PullResp(PullResp::new(&buffer, num_recv)?),
-            Identifier::PullAck => Packet::PullAck(PullAck::new(&buffer, num_recv)?),
-            Identifier::PushAck => Packet::PushAck(PushAck::new(&buffer, num_recv)?),
-        })
-    } else {
-        Err(Error::InvalidIdentifier.into())
+fn random_token(buffer: &[u8]) -> u16 {
+    (buffer[1] as u16) << 8 | buffer[2] as u16
+}
+
+fn gateway_mac(buffer: &[u8]) -> MacAddress {
+    MacAddress::new(array_ref![buffer, 4, 6])
+}
+
+#[derive(Debug)]
+pub struct Packet {
+    random_token: u16,
+    gateway_mac: Option<MacAddress>,
+    data: PacketData,
+}
+
+impl Packet {
+    pub fn parse(buffer: &[u8], num_recv: usize) -> Result<Packet> {
+        if buffer[0] != PROTOCOL_VERSION {
+            Err(Error::InvalidProtocolVersion.into())
+        } else {
+            if let Ok(id) = Identifier::try_from(buffer[3]) {
+                Ok(Packet {
+                    // all packets have random_token
+                    random_token: random_token(buffer),
+                    // only PULL_DATA nad PUSH_DATA have MAC_IDs
+                    gateway_mac: match id {
+                        Identifier::PullData | Identifier::PushData => Some(gateway_mac(buffer)),
+                        _ => None,
+                    },
+                    data: match id {
+                        Identifier::PullData => PacketData::PullData,
+                        Identifier::PushData => PacketData::PushData(serde_json::from_str(
+                            std::str::from_utf8(&buffer[12..num_recv])?,
+                        )?),
+                        Identifier::PullResp => PacketData::PullResp,
+                        Identifier::PullAck => PacketData::PullAck,
+                        Identifier::PushAck => PacketData::PushAck,
+                    },
+                })
+            } else {
+                Err(Error::InvalidIdentifier.into())
+            }
+        }
     }
 }
 
@@ -74,7 +103,7 @@ pub fn run() -> Result<()> {
                         print!("0x{:X}, ", buffer[i])
                     }
                     println!("]");
-                    let msg = parse_gateway_rx(&mut buffer, num_recv)?;
+                    let msg = Packet::parse(&mut buffer, num_recv)?;
                     println!("{:?}", msg);
                     buffer = [0; 1024];
                 }

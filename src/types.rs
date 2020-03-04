@@ -2,8 +2,6 @@ use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use super::Result;
-
 #[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
 #[repr(u8)]
 pub enum Identifier {
@@ -14,98 +12,19 @@ pub enum Identifier {
     PullAck = 4,
 }
 
-fn random_token(buffer: &[u8]) -> u16 {
-    (buffer[1] as u16) << 8 | buffer[2] as u16
-}
-
-fn gateway_mac(buffer: &[u8]) -> MacAddress {
-    MacAddress::new(array_ref![buffer, 4, 6])
-}
-
 #[derive(Debug)]
-pub enum Packet {
+pub enum PacketData {
     PushData(PushData),
-    PushAck(PushAck),
-    PullData(PullData),
-    PullResp(PullResp),
-    PullAck(PullAck),
-}
-
-#[derive(Debug)]
-pub struct PushData {
-    random_token: u16,
-    gateway_mac: MacAddress,
-    data: PushDataJson,
+    PushAck,
+    PullData,
+    PullResp,
+    PullAck,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct PushDataJson {
+pub struct PushData {
     rxpk: Option<Vec<RxPk>>,
     stat: Option<Stat>,
-}
-
-impl PushData {
-    pub fn new(buffer: &[u8], num_recv: usize) -> Result<PushData> {
-        Ok(PushData {
-            random_token: random_token(buffer),
-            gateway_mac: gateway_mac(buffer),
-            data: serde_json::from_str(std::str::from_utf8(&buffer[12..num_recv])?)?,
-        })
-    }
-}
-
-#[derive(Debug)]
-pub struct PushAck {
-    random_token: u16,
-}
-
-impl PushAck {
-    pub fn new(buffer: &[u8], _num_recv: usize) -> Result<PushAck> {
-        Ok(PushAck {
-            random_token: random_token(buffer),
-        })
-    }
-}
-
-#[derive(Debug)]
-pub struct PullData {
-    random_token: u16,
-    gateway_mac: MacAddress,
-}
-
-impl PullData {
-    pub fn new(buffer: &[u8], _num_recv: usize) -> Result<PullData> {
-        Ok(PullData {
-            random_token: random_token(buffer),
-            gateway_mac: gateway_mac(buffer),
-        })
-    }
-}
-
-#[derive(Debug)]
-pub struct PullResp {
-    random_token: u16, // need json objs
-}
-
-impl PullResp {
-    pub fn new(buffer: &[u8], _num_recv: usize) -> Result<PullResp> {
-        Ok(PullResp {
-            random_token: random_token(buffer),
-        })
-    }
-}
-
-#[derive(Debug)]
-pub struct PullAck {
-    random_token: u16,
-}
-
-impl PullAck {
-    pub fn new(buffer: &[u8], _num_recv: usize) -> Result<PullAck> {
-        Ok(PullAck {
-            random_token: random_token(buffer),
-        })
-    }
 }
 
 #[derive(Debug)]
