@@ -84,7 +84,7 @@ impl Packet {
         match self.data {
 
             PacketData::PushData(data) => {
-                w.write(data.as_bytes()?.as_slice());
+                w.write(data.as_bytes()?.as_slice())?;
             }
             _ => (),
         };

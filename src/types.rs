@@ -90,7 +90,7 @@ impl PushData {
             }
             v.push(b']');
             // append with comma if stat exists
-            if let Some(stat) = &self.stat {
+            if let Some(_) = &self.stat {
                 v.push(b',');
             }
         }
@@ -148,6 +148,7 @@ pub struct RxPk {
     tmst: u64,
 }
 
+// the order of this is important as it makes us identical to Semtech
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Stat {
     time: String,
