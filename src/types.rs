@@ -10,6 +10,7 @@ pub enum Identifier {
     PullData = 2,
     PullResp = 3,
     PullAck = 4,
+    TxAck = 5,
 }
 
 #[derive(Debug)]
@@ -17,91 +18,22 @@ pub enum PacketData {
     PushData(PushData),
     PushAck,
     PullData,
-    PullResp,
+    PullResp(PullResp),
     PullAck,
+    TxAck,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PushData {
-    rxpk: Option<Vec<RxPk>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rxpk: Option<Vec<RxPk>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     stat: Option<Stat>,
 }
 
-use std::error::Error;
-impl PushData {
-    // Write our own serializer so that we can match Semtech format exactly
-    // There are two things that we need slightly different behavior to match
-    // byte for byte the Semtech output
-    // 
-    // First off, rxpk and stat may both be in PushData payload, but when they
-    // are omitted, there is no null value which is what serde was doing by default
-    //
-    // Secondly, they represent frequency with 6 points of precision
-    // serde by default drops the useless 0s
-    pub fn as_bytes(&self) -> std::result::Result<Vec<u8>, Box<dyn Error>> {
-        let mut v = Vec::new();
-        v.push(b'{');
-        if let Some(rxpk) = &self.rxpk {
-            //w.write("\"rxpk\":[".as_bytes())?;
-            v.extend_from_slice("\"rxpk\":[".as_bytes());
-
-            for (index, pk) in rxpk.iter().enumerate() {
-                v.extend_from_slice("{\"tmst\":".as_bytes());
-                v.extend_from_slice(serde_json::to_string(&pk.tmst)?.as_bytes());
-
-                v.extend_from_slice(",\"chan\":".as_bytes());
-                v.extend_from_slice(serde_json::to_string(&pk.chan)?.as_bytes());
-
-                v.extend_from_slice(",\"rfch\":".as_bytes());
-                v.extend_from_slice(serde_json::to_string(&pk.rfch)?.as_bytes());
-
-                v.extend_from_slice(",\"freq\":".as_bytes());
-                v.extend_from_slice(format!("{:.6}", pk.freq).as_bytes());
-
-                v.extend_from_slice(",\"stat\":".as_bytes());
-                v.extend_from_slice(serde_json::to_string(&pk.stat)?.as_bytes());
-
-                v.extend_from_slice(",\"modu\":".as_bytes());
-                v.extend_from_slice(serde_json::to_string(&pk.modu)?.as_bytes());
-
-                v.extend_from_slice(",\"datr\":".as_bytes());
-                v.extend_from_slice(serde_json::to_string(&pk.datr)?.as_bytes());
-
-                v.extend_from_slice(",\"codr\":".as_bytes());
-                v.extend_from_slice(serde_json::to_string(&pk.codr)?.as_bytes());
-
-                v.extend_from_slice(",\"lsnr\":".as_bytes());
-                v.extend_from_slice(serde_json::to_string(&pk.lsnr)?.as_bytes());
-
-                v.extend_from_slice(",\"rssi\":".as_bytes());
-                v.extend_from_slice(serde_json::to_string(&pk.rssi)?.as_bytes());
-
-                v.extend_from_slice(",\"size\":".as_bytes());
-                v.extend_from_slice(serde_json::to_string(&pk.size)?.as_bytes());
-
-                v.extend_from_slice(",\"data\":".as_bytes());
-                v.extend_from_slice(serde_json::to_string(&pk.data)?.as_bytes());
-
-                v.push(b'}');
-
-                if index != rxpk.len()-1 {
-                    v.push(b',');
-                }
-            }
-            v.push(b']');
-            // append with comma if stat exists
-            if let Some(_) = &self.stat {
-                v.push(b',');
-            }
-        }
-
-        if let Some(stat) = &self.stat {
-            v.extend_from_slice("\"stat\":".as_bytes());
-            v.extend_from_slice(serde_json::to_string(&stat)?.as_bytes());
-        }
-        v.push(b'}');
-        Ok(v)
-    }
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PullResp {
+    pub txpk: TxPk,
 }
 
 #[derive(Debug)]
@@ -136,7 +68,7 @@ impl fmt::Display for MacAddress {
 pub struct RxPk {
     chan: u64,
     codr: String,
-    data: String,
+    pub data: String,
     datr: String,
     freq: f64,
     lsnr: f64,
@@ -159,3 +91,26 @@ pub struct Stat {
     dwnb: u64,
     txnb: u64,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TxPk {
+    imme: bool, // Send packet immediately (will ignore tmst & time)
+    tmst: u64, // Send packet on a certain timestamp value (will ignore time)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tmms: Option<u64>, // Send packet at a certain GPS time (GPS synchronization required)
+    freq: f64, // TX central frequency in MHz (unsigned float, Hz precision)
+    rfch: u64, // Concentrator "RF chain" used for TX (unsigned integer)
+    powe: u64, // TX output power in dBm (unsigned integer, dBm precision)
+    modu: String, // Modulation identifier "LORA" or "FSK"
+    datr: String, // LoRa datarate identifier (eg. SF12BW500)
+    codr: String, // LoRa ECC coding rate identifier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fdev: Option<u64>, //FSK frequency deviation (unsigned integer, in Hz) 
+    ipol: bool, // Lora modulation polarization inversion
+    prea: Option<u64>, // RF preamble size (unsigned integer)
+    size: u64, // RF packet payload size in bytes (unsigned integer)
+    pub data: String, // Base64 encoded RF packet payload, padding optional
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ncrc: Option<bool>, // If true, disable the CRC of the physical layer (optional)
+}
+

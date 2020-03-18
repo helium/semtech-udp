@@ -4,11 +4,15 @@ version = "0.1.0"
 authors = ["Louis Thiery <louis@helium.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-mio = "0.6"
 num_enum = "0.4"
 arrayref = "0.3"
 serde_json = { version = "1.0" }
 serde = { version = "1.0.100", default-features = false,  features = ["derive"] }
+
+[dev-dependencies]
+mio = "0.6"
+etherparse = "0.9.0"
+pcap = "0.7.0"
+lorawan = { git = "https://github.com/ivajloip/rust-lorawan"}
+base64 = "0.12.0"

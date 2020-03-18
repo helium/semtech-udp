@@ -7,7 +7,7 @@ use std::io::{Cursor, Write};
 
 mod error;
 mod types;
-use types::*;
+pub use types::*;
 #[cfg(test)]
 mod tests;
 
@@ -28,7 +28,13 @@ pub struct Packet {
     data: PacketData,
 }
 
+
 impl Packet {
+
+    pub fn data(&self) -> &PacketData {
+        &self.data
+    }
+
     pub fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Box<dyn stdError>> {
         if buffer[0] != PROTOCOL_VERSION {
             Err(Error::InvalidProtocolVersion.into())
@@ -39,20 +45,23 @@ impl Packet {
                     random_token: random_token(buffer),
                     // only PULL_DATA nad PUSH_DATA have MAC_IDs
                     gateway_mac: match id {
-                        Identifier::PullData | Identifier::PushData => Some(gateway_mac(buffer)),
+                        Identifier::PullData | Identifier::PushData | Identifier::TxAck => Some(gateway_mac(buffer)),
                         _ => None,
                     },
                     data: match id {
                         Identifier::PullData => PacketData::PullData,
                         Identifier::PushData => {
                             let json_str = std::str::from_utf8(&buffer[12..num_recv])?;
-                            println!("{:?}", json_str);
                             PacketData::PushData(serde_json::from_str(json_str)?)
-                        }
-                        ,
-                        Identifier::PullResp => PacketData::PullResp,
+                        },
+                        Identifier::PullResp => {
+                            let json_str = std::str::from_utf8(&buffer[4..num_recv])?;
+                            PacketData::PullResp(serde_json::from_str(json_str)?)
+                        },
                         Identifier::PullAck => PacketData::PullAck,
                         Identifier::PushAck => PacketData::PushAck,
+                        Identifier::TxAck => PacketData::TxAck,
+
                     },
                 })
             } else {
@@ -73,8 +82,9 @@ impl Packet {
             PacketData::PushData(_) => Identifier::PushData,
             PacketData::PushAck => Identifier::PushAck,
             PacketData::PullData => Identifier::PullData,
-            PacketData::PullResp => Identifier::PullResp,
+            PacketData::PullResp(_) => Identifier::PullResp,
             PacketData::PullAck => Identifier::PullAck,
+            PacketData::TxAck => Identifier::TxAck,
         } as u8])?;
 
         if let Some(mac) = self.gateway_mac {
@@ -82,9 +92,8 @@ impl Packet {
         };
 
         match self.data {
-
             PacketData::PushData(data) => {
-                w.write(data.as_bytes()?.as_slice())?;
+                w.write(&serde_json::to_string(&data)?.as_bytes())?;
             }
             _ => (),
         };
