@@ -69,12 +69,12 @@ pub struct RxPk {
     chan: u64,
     codr: String,
     pub data: String,
-    datr: String,
-    freq: f64,
-    lsnr: f64,
+    pub datr: String,
+    pub freq: f64,
+    pub lsnr: f64,
     modu: String,
     rfch: u64,
-    rssi: i64,
+    pub rssi: i64,
     size: u64,
     stat: u64,
     tmst: u64,
@@ -95,22 +95,21 @@ pub struct Stat {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TxPk {
     imme: bool, // Send packet immediately (will ignore tmst & time)
-    tmst: u64, // Send packet on a certain timestamp value (will ignore time)
+    tmst: u64,  // Send packet on a certain timestamp value (will ignore time)
     #[serde(skip_serializing_if = "Option::is_none")]
     tmms: Option<u64>, // Send packet at a certain GPS time (GPS synchronization required)
-    freq: f64, // TX central frequency in MHz (unsigned float, Hz precision)
-    rfch: u64, // Concentrator "RF chain" used for TX (unsigned integer)
-    powe: u64, // TX output power in dBm (unsigned integer, dBm precision)
+    pub freq: f64, // TX central frequency in MHz (unsigned float, Hz precision)
+    rfch: u64,  // Concentrator "RF chain" used for TX (unsigned integer)
+    powe: u64,  // TX output power in dBm (unsigned integer, dBm precision)
     modu: String, // Modulation identifier "LORA" or "FSK"
-    datr: String, // LoRa datarate identifier (eg. SF12BW500)
+    pub datr: String, // LoRa datarate identifier (eg. SF12BW500)
     codr: String, // LoRa ECC coding rate identifier
     #[serde(skip_serializing_if = "Option::is_none")]
-    fdev: Option<u64>, //FSK frequency deviation (unsigned integer, in Hz) 
+    fdev: Option<u64>, //FSK frequency deviation (unsigned integer, in Hz)
     ipol: bool, // Lora modulation polarization inversion
     prea: Option<u64>, // RF preamble size (unsigned integer)
-    size: u64, // RF packet payload size in bytes (unsigned integer)
+    size: u64,  // RF packet payload size in bytes (unsigned integer)
     pub data: String, // Base64 encoded RF packet payload, padding optional
     #[serde(skip_serializing_if = "Option::is_none")]
     ncrc: Option<bool>, // If true, disable the CRC of the physical layer (optional)
 }
-

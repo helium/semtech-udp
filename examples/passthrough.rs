@@ -11,7 +11,7 @@ const RADIO: Token = Token(1);
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 fn main() -> Result<()> {
-    let client_server ="192.168.2.68:1680".parse()?;
+    let client_server = "192.168.2.68:1680".parse()?;
     let mut client_socket = UdpSocket::bind(&"0.0.0.0:58058".parse()?)?;
     let radio_server = "0.0.0.0:1680".parse()?;
     let mut radio_socket = UdpSocket::bind(&radio_server)?;
@@ -55,7 +55,6 @@ fn main() -> Result<()> {
                     let msg = semtech_udp::Packet::parse(&mut buffer, num_recv)?;
                     buffer = [0; 1024];
                     println!("From radio {:?}", msg)
-
                 }
                 _ => unreachable!(),
             }

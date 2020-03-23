@@ -28,9 +28,7 @@ pub struct Packet {
     data: PacketData,
 }
 
-
 impl Packet {
-
     pub fn data(&self) -> &PacketData {
         &self.data
     }
@@ -45,7 +43,9 @@ impl Packet {
                     random_token: random_token(buffer),
                     // only PULL_DATA nad PUSH_DATA have MAC_IDs
                     gateway_mac: match id {
-                        Identifier::PullData | Identifier::PushData | Identifier::TxAck => Some(gateway_mac(buffer)),
+                        Identifier::PullData | Identifier::PushData | Identifier::TxAck => {
+                            Some(gateway_mac(buffer))
+                        }
                         _ => None,
                     },
                     data: match id {
@@ -53,15 +53,14 @@ impl Packet {
                         Identifier::PushData => {
                             let json_str = std::str::from_utf8(&buffer[12..num_recv])?;
                             PacketData::PushData(serde_json::from_str(json_str)?)
-                        },
+                        }
                         Identifier::PullResp => {
                             let json_str = std::str::from_utf8(&buffer[4..num_recv])?;
                             PacketData::PullResp(serde_json::from_str(json_str)?)
-                        },
+                        }
                         Identifier::PullAck => PacketData::PullAck,
                         Identifier::PushAck => PacketData::PushAck,
                         Identifier::TxAck => PacketData::TxAck,
-
                     },
                 })
             } else {
