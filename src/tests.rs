@@ -91,14 +91,15 @@ fn test_push_data_stat() {
     // }
 }
 
-use crate::types::Tmst;
+use crate::types::StringOrNum;
+
 #[test]
 fn test_immediate_send() {
     let json = 
         "{\"codr\":\"4/5\",\"data\":\"QDDaAAHUbYkmAGY3AFAvfpbHJeCeuDu3xbCCHeg7YPOUJOfBCSc4Y3LtT4aToTGl9AYK4+NiALvTgey0M4ZJzh43vLaaXzFHko0jlb0CVeNgAtbTsAttQ\",\"datr\":\"SF10BW125\",\"freq\":904.1,\"imme\":true,\"ipol\":false,\"modu\":\"LORA\",\"powe\":27,\"rfch\":0,\"size\":87,\"tmst\":\"immediate\"}";
 
     let txpk: TxPk = serde_json::from_str(json).unwrap();
-    if let Tmst::immediate = txpk.tmst {
+    if let StringOrNum::S(_) = txpk.tmst {
         assert!(true);
     } else {
         assert!(false);
@@ -110,7 +111,7 @@ fn test_timed_send() {
         "{\"codr\":\"4/5\",\"data\":\"IHLF2EA+n8BFY1vrCU1k/Vg=\",\"datr\":\"SF10BW500\",\"freq\":926.9000244140625,\"imme\":false,\"ipol\":true,\"modu\":\"LORA\",\"powe\":27,\"rfch\":0,\"size\":17,\"tmst\":727050748}";
 
     let txpk: TxPk = serde_json::from_str(json).unwrap();
-    if let Tmst::immediate = txpk.tmst {
+    if let StringOrNum::N(_) = txpk.tmst {
         assert!(true);
     } else {
         assert!(false);

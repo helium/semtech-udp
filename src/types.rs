@@ -92,26 +92,19 @@ pub struct Stat {
     txnb: u64,
 }
 
-#[allow(non_camel_case_types)]
 #[derive(Debug, Serialize, Deserialize)]
-pub enum Tmst {
-    NUM(u64),
-    immediate
-}
-
-#[allow(non_camel_case_types)]
-#[derive(Debug, Serialize, Deserialize)]
-enum Tmms {
-    NUM(Option<u64>),
-    immediate
+#[serde(untagged)]
+pub enum StringOrNum {
+    S(String),
+    N(u64),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TxPk {
     imme: bool, // Send packet immediately (will ignore tmst & time)
-    pub tmst: Tmst,  // Send packet on a certain timestamp value (will ignore time)
-    //#[serde(skip_serializing_if = "Option::is_none")]
-    tmms: Option<u64>, // Send packet at a certain GPS time (GPS synchronization required)
+    pub tmst: StringOrNum,  // Send packet on a certain timestamp value (will ignore time)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tmms: Option<StringOrNum>, // Send packet at a certain GPS time (GPS synchronization required)
     pub freq: f64, // TX central frequency in MHz (unsigned float, Hz precision)
     rfch: u64,  // Concentrator "RF chain" used for TX (unsigned integer)
     powe: u64,  // TX output power in dBm (unsigned integer, dBm precision)
