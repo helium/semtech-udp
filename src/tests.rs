@@ -104,6 +104,18 @@ fn test_immediate_send() {
         assert!(false);
     }
 }
+#[test]
+fn test_timed_send() {
+    let json = 
+        "{\"codr\":\"4/5\",\"data\":\"IHLF2EA+n8BFY1vrCU1k/Vg=\",\"datr\":\"SF10BW500\",\"freq\":926.9000244140625,\"imme\":false,\"ipol\":true,\"modu\":\"LORA\",\"powe\":27,\"rfch\":0,\"size\":17,\"tmst\":727050748}";
+
+    let txpk: TxPk = serde_json::from_str(json).unwrap();
+    if let Tmst::immediate = txpk.tmst {
+        assert!(true);
+    } else {
+        assert!(false);
+    }
+}
 
 
 
