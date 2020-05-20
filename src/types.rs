@@ -101,22 +101,22 @@ pub enum StringOrNum {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TxPk {
-    imme: bool, // Send packet immediately (will ignore tmst & time)
-    pub tmst: StringOrNum,  // Send packet on a certain timestamp value (will ignore time)
+    imme: bool,            // Send packet immediately (will ignore tmst & time)
+    pub tmst: StringOrNum, // Send packet on a certain timestamp value (will ignore time)
     #[serde(skip_serializing_if = "Option::is_none")]
     tmms: Option<StringOrNum>, // Send packet at a certain GPS time (GPS synchronization required)
-    pub freq: f64, // TX central frequency in MHz (unsigned float, Hz precision)
-    rfch: u64,  // Concentrator "RF chain" used for TX (unsigned integer)
-    powe: u64,  // TX output power in dBm (unsigned integer, dBm precision)
-    modu: String, // Modulation identifier "LORA" or "FSK"
-    pub datr: String, // LoRa datarate identifier (eg. SF12BW500)
-    codr: String, // LoRa ECC coding rate identifier
+    pub freq: f64,         // TX central frequency in MHz (unsigned float, Hz precision)
+    rfch: u64,             // Concentrator "RF chain" used for TX (unsigned integer)
+    powe: u64,             // TX output power in dBm (unsigned integer, dBm precision)
+    modu: String,          // Modulation identifier "LORA" or "FSK"
+    pub datr: String,      // LoRa datarate identifier (eg. SF12BW500)
+    codr: String,          // LoRa ECC coding rate identifier
     #[serde(skip_serializing_if = "Option::is_none")]
     fdev: Option<u64>, //FSK frequency deviation (unsigned integer, in Hz)
-    ipol: bool, // Lora modulation polarization inversion
-    prea: Option<u64>, // RF preamble size (unsigned integer)
-    size: u64,  // RF packet payload size in bytes (unsigned integer)
-    pub data: String, // Base64 encoded RF packet payload, padding optional
+    ipol: bool,            // Lora modulation polarization inversion
+    prea: Option<u64>,     // RF preamble size (unsigned integer)
+    size: u64,             // RF packet payload size in bytes (unsigned integer)
+    pub data: String,      // Base64 encoded RF packet payload, padding optional
     #[serde(skip_serializing_if = "Option::is_none")]
     ncrc: Option<bool>, // If true, disable the CRC of the physical layer (optional)
 }
