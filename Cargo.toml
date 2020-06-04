@@ -3,6 +3,9 @@ name = "semtech-udp"
 version = "0.1.0"
 authors = ["Louis Thiery <louis@helium.com>"]
 edition = "2018"
+description = "Semtech UDP provides serialization and deserialization of packets complying with the Semtech UDP protocol"
+license = "Apache 2.0"
+keywords = ["lorawan", "iot", "lpwan", "semtech"]
 
 [dependencies]
 num_enum = "0.4"
