@@ -17,5 +17,5 @@ serde = { version = "1.0.100", default-features = false,  features = ["derive"] 
 mio = "0.6"
 etherparse = "0.9.0"
 pcap = "0.7.0"
-lorawan = { git = "https://github.com/ivajloip/rust-lorawan"}
+lorawan = "0.6.0"
 base64 = "0.12.0"
