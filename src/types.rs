@@ -28,7 +28,7 @@ pub struct PushData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rxpk: Option<Vec<RxPk>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    stat: Option<Stat>,
+    pub stat: Option<Stat>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -66,18 +66,18 @@ impl fmt::Display for MacAddress {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RxPk {
-    chan: u64,
-    codr: String,
+    pub chan: u64,
+    pub codr: String,
     pub data: String,
     pub datr: String,
     pub freq: f64,
     pub lsnr: f64,
-    modu: String,
-    rfch: u64,
+    pub modu: String,
+    pub rfch: u64,
     pub rssi: i64,
-    size: u64,
-    stat: u64,
-    tmst: u64,
+    pub size: u64,
+    pub stat: u64,
+    pub tmst: u64,
 }
 
 // the order of this is important as it makes us identical to Semtech

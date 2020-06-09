@@ -17,20 +17,36 @@ fn random_token(buffer: &[u8]) -> u16 {
     (buffer[1] as u16) << 8 | buffer[2] as u16
 }
 
-fn gateway_mac(buffer: &[u8]) -> MacAddress {
-    MacAddress::new(array_ref![buffer, 4, 8])
+pub fn gateway_mac(buffer: &[u8]) -> MacAddress {
+    MacAddress::new(array_ref![buffer, 0, 8])
 }
 
 #[derive(Debug)]
 pub struct Packet {
     random_token: u16,
     gateway_mac: Option<MacAddress>,
-    data: PacketData,
+    pub data: PacketData,
 }
 
 impl Packet {
+    pub fn from_data(data: PacketData) -> Packet{
+        Packet {
+            random_token: 0,
+            gateway_mac: None,
+            data,
+        }
+    }
+
     pub fn data(&self) -> &PacketData {
         &self.data
+    }
+
+    pub fn set_gateway_mac(&mut self, mac: &[u8]) {
+        self.gateway_mac = Some(gateway_mac(&mac));
+    }
+
+    pub fn set_token(&mut self, token: u16) {
+        self.random_token = token;
     }
 
     pub fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Box<dyn stdError>> {
@@ -52,10 +68,12 @@ impl Packet {
                         Identifier::PullData => PacketData::PullData,
                         Identifier::PushData => {
                             let json_str = std::str::from_utf8(&buffer[12..num_recv])?;
+                            println!("{:}", json_str);
                             PacketData::PushData(serde_json::from_str(json_str)?)
                         }
                         Identifier::PullResp => {
                             let json_str = std::str::from_utf8(&buffer[4..num_recv])?;
+                            println!("{:}", json_str);
                             PacketData::PullResp(serde_json::from_str(json_str)?)
                         }
                         Identifier::PullAck => PacketData::PullAck,
