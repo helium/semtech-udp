@@ -29,7 +29,7 @@ pub struct Packet {
 }
 
 impl Packet {
-    pub fn from_data(data: PacketData) -> Packet{
+    pub fn from_data(data: PacketData) -> Packet {
         Packet {
             random_token: 0,
             gateway_mac: None,
@@ -68,12 +68,10 @@ impl Packet {
                         Identifier::PullData => PacketData::PullData,
                         Identifier::PushData => {
                             let json_str = std::str::from_utf8(&buffer[12..num_recv])?;
-                            println!("{:}", json_str);
                             PacketData::PushData(serde_json::from_str(json_str)?)
                         }
                         Identifier::PullResp => {
                             let json_str = std::str::from_utf8(&buffer[4..num_recv])?;
-                            println!("{:}", json_str);
                             PacketData::PullResp(serde_json::from_str(json_str)?)
                         }
                         Identifier::PullAck => PacketData::PullAck,
