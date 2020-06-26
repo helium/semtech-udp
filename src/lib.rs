@@ -21,7 +21,7 @@ pub fn gateway_mac(buffer: &[u8]) -> MacAddress {
     MacAddress::new(array_ref![buffer, 0, 8])
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Packet {
     random_token: u16,
     gateway_mac: Option<MacAddress>,
