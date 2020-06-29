@@ -25,7 +25,7 @@ pub fn gateway_mac(buffer: &[u8]) -> MacAddress {
 pub struct Packet {
     random_token: u16,
     gateway_mac: Option<MacAddress>,
-    pub data: PacketData,
+    data: PacketData,
 }
 
 impl Packet {
