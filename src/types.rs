@@ -13,7 +13,7 @@ pub enum Identifier {
     TxAck = 5,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PacketData {
     PushData(PushData),
     PushAck,
@@ -23,20 +23,20 @@ pub enum PacketData {
     TxAck,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PushData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rxpk: Option<Vec<RxPk>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    stat: Option<Stat>,
+    pub stat: Option<Stat>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PullResp {
     pub txpk: TxPk,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct MacAddress {
     bytes: [u8; 8],
 }
@@ -64,24 +64,24 @@ impl fmt::Display for MacAddress {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RxPk {
-    chan: u64,
-    codr: String,
+    pub chan: u64,
+    pub codr: String,
     pub data: String,
     pub datr: String,
     pub freq: f64,
     pub lsnr: f64,
-    modu: String,
-    rfch: u64,
+    pub modu: String,
+    pub rfch: u64,
     pub rssi: i64,
-    size: u64,
-    stat: u64,
-    tmst: u64,
+    pub size: u64,
+    pub stat: u64,
+    pub tmst: u64,
 }
 
 // the order of this is important as it makes us identical to Semtech
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Stat {
     time: String,
     rxnb: u64,
@@ -92,14 +92,14 @@ pub struct Stat {
     txnb: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum StringOrNum {
     S(String),
     N(u64),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TxPk {
     imme: bool,            // Send packet immediately (will ignore tmst & time)
     pub tmst: StringOrNum, // Send packet on a certain timestamp value (will ignore time)
