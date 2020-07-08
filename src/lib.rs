@@ -59,7 +59,8 @@ impl Packet {
                 // only PULL_DATA nad PUSH_DATA have MAC_IDs
                 gateway_mac: match id {
                     Identifier::PullData | Identifier::PushData | Identifier::TxAck => {
-                        Some(gateway_mac(buffer))
+                        println!("id {:?}", id);
+                        Some(gateway_mac(&buffer[3..11]))
                     }
                     _ => None,
                 },
@@ -102,7 +103,7 @@ impl Packet {
         } as u8])?;
 
         if let Some(mac) = self.gateway_mac {
-            w.write_all(mac.bytes())?;
+            w.write_all(&mac.bytes())?;
         };
 
         if let PacketData::PushData(data)  = self.data {
