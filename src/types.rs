@@ -36,20 +36,9 @@ pub struct PullResp {
     pub txpk: TxPk,
 }
 
-#[derive(Debug, Copy, Clone, Hash)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq)]
 pub struct MacAddress {
     bytes: [u8; 8],
-}
-
-impl PartialEq<MacAddress> for MacAddress {
-    fn eq(&self, other: &MacAddress) -> bool {
-        for (x, y) in self.bytes.iter().zip(&other.bytes) {
-            if *x != *y {
-                return false;
-            }
-        }
-        true
-    }
 }
 
 impl Eq for MacAddress {}

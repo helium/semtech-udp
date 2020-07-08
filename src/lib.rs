@@ -80,8 +80,7 @@ impl Packet {
                     }
                     Identifier::PullResp => {
                         let json_str = std::str::from_utf8(&buffer[4..num_recv])?;
-                        let ret = PacketData::PullResp(serde_json::from_str(json_str)?);
-                        ret
+                        PacketData::PullResp(serde_json::from_str(json_str)?)
                     }
                     Identifier::PullAck => PacketData::PullAck,
                     Identifier::PushAck => PacketData::PushAck,

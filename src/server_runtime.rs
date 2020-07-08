@@ -129,7 +129,7 @@ impl UdpRuntime {
 
         let udp_rx = UdpRx {
             socket_receiver,
-            udp_tx_sender: udp_tx_sender.clone(),
+            udp_tx_sender,
             client_tx_sender: client_tx_sender.clone(),
         };
 
