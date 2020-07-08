@@ -58,6 +58,7 @@ impl Packet {
         self.random_token
     }
 
+
     pub fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Box<dyn stdError>> {
         if buffer[0] != PROTOCOL_VERSION {
             Err(Error::InvalidProtocolVersion.into())
