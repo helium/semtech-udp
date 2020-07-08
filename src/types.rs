@@ -86,6 +86,9 @@ pub struct RxPk {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Stat {
     time: String,
+    lati: f64,
+    long: f64,
+    alti: u64,
     rxnb: u64,
     rxok: u64,
     rxfw: u64,

@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = SocketAddr::from(([0, 0, 0, 0], 2132));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 1680));
 
     let mut udp_runtime = UdpRuntime::new(addr).await?;
 
@@ -22,6 +22,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Event::Packet(packet) => {
                     match &packet.data() {
                         PacketData::PushData(data) => {
+                            if let Some(stat) = &data.stat {
+                                println!("Stat report: {:?}", stat);
+                            }
                             if let Some(rxpk) = &data.rxpk {
                                 println!("Received packets:");
                                 for recived_packet in rxpk {
@@ -53,16 +56,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         PacketData::PullResp(PullResp { txpk }),
                                     );
 
-                                    println!("Sending  packet");
+                                    // this async call returns when TxAck is received
                                     udp_runtime
                                         .send(downlink_packet, packet.get_gateway_mac().unwrap())
                                         .await?;
-                                    println!("ACK received!");
                                 }
                             }
                         }
                         // these are generally uninteresting but available for debug
-                        _ => (),
+                        _ => println!("{:?}", packet)
                     }
                 }
             }

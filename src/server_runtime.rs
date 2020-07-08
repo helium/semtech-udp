@@ -241,7 +241,6 @@ impl UdpTx {
             if let Some(msg) = msg {
                 match msg {
                     UdpMessage::Packet((packet, mac)) => {
-                        println!("Sending packet {:?}", packet);
                         if let Some(addr) = self.clients.get(&mac) {
                             let n = packet.serialize(&mut buf)? as usize;
                             let _sent = self.socket_sender.send_to(&buf[..n], addr).await?;
