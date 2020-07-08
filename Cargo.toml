@@ -13,10 +13,14 @@ num_enum = "0.4"
 arrayref = "0.3"
 serde_json = { version = "1.0" }
 serde = { version = "1.0.100", default-features = false,  features = ["derive"] }
+rand = "0.7.3"
 
 [dev-dependencies]
-mio = "0.6"
 etherparse = "0.9.0"
 pcap = "0.7.0"
 lorawan = "0.6.0"
 base64 = "0.12.0"
+
+[dependencies.tokio]
+version = "0.2.21"
+features = ["tcp", "udp", "rt-threaded", "macros", "sync", "time"]

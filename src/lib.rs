@@ -11,6 +11,8 @@ pub use types::*;
 #[cfg(test)]
 mod tests;
 
+pub mod server_runtime;
+
 const PROTOCOL_VERSION: u8 = 2;
 
 fn random_token(buffer: &[u8]) -> u16 {
