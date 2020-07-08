@@ -9,7 +9,7 @@ use tokio::sync::{
 
 #[derive(Debug)]
 enum UdpMessage {
-    Packet((Packet,MacAddress)),
+    Packet((Packet, MacAddress)),
     Client((MacAddress, SocketAddr)),
 }
 
@@ -62,7 +62,11 @@ pub struct UdpRuntime {
 use rand::Rng;
 
 impl ClientRx {
-    pub async fn send(&mut self, mut packet: Packet, mac: MacAddress) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn send(
+        &mut self,
+        mut packet: Packet,
+        mac: MacAddress,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // assign random token
         let mut rng = rand::thread_rng();
 
@@ -88,7 +92,11 @@ impl UdpRuntime {
         (self.tx, self.rx)
     }
 
-    pub async fn send(&mut self, packet: Packet, mac: MacAddress) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn send(
+        &mut self,
+        packet: Packet,
+        mac: MacAddress,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.rx.send(packet, mac).await
     }
 
@@ -166,8 +174,10 @@ impl ClientRxTranslator {
     pub async fn run(mut self) -> Result<(), Box<dyn std::error::Error>> {
         loop {
             let msg = self.receiver.recv().await;
-            if let Some((packet,mac)) = msg {
-                self.udp_tx_sender.send(UdpMessage::Packet((packet, mac))).await?;
+            if let Some((packet, mac)) = msg {
+                self.udp_tx_sender
+                    .send(UdpMessage::Packet((packet, mac)))
+                    .await?;
             }
         }
     }
@@ -195,7 +205,6 @@ impl UdpRx {
                             // pull data is specially treated
                             PacketData::PullData => {
                                 if let Some(mac) = packet.gateway_mac {
-
                                     // first send (mac, addr) to update map owned by UdpRuntimeTx
                                     let client = (mac, src);
                                     self.udp_tx_sender.send(UdpMessage::Client(client)).await?;
@@ -212,7 +221,7 @@ impl UdpRx {
                             }
                             // PushData and TxAck are expected, but not specially handled
                             PacketData::PushData(_) | PacketData::TxAck => (),
-                            PacketData::PushAck |  PacketData::PullAck | PacketData::PullResp(_) => {
+                            PacketData::PushAck | PacketData::PullAck | PacketData::PullResp(_) => {
                                 panic!("Should not receive this frame from forwarder")
                             }
                         };
@@ -238,7 +247,6 @@ impl UdpTx {
                             let _sent = self.socket_sender.send_to(&buf[..n], addr).await?;
                             //buf.clear();
                         }
-
                     }
                     UdpMessage::Client((mac, addr)) => {
                         // tell user if same MAC has new IP

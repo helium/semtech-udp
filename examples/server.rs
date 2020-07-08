@@ -54,7 +54,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     );
 
                                     println!("Sending  packet");
-                                    udp_runtime.send(downlink_packet, packet.get_gateway_mac().unwrap()).await?;
+                                    udp_runtime
+                                        .send(downlink_packet, packet.get_gateway_mac().unwrap())
+                                        .await?;
                                     println!("ACK received!");
                                 }
                             }
