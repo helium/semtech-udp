@@ -47,8 +47,15 @@ impl Packet {
         self.gateway_mac = Some(gateway_mac(&mac));
     }
 
+    pub fn get_gateway_mac(&self) -> &Option<MacAddress> {
+        &self.gateway_mac
+    }
+
     pub fn set_token(&mut self, token: u16) {
         self.random_token = token;
+    }
+    pub fn get_token(&self) -> u16 {
+        self.random_token
     }
 
     pub fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Box<dyn stdError>> {
@@ -61,8 +68,7 @@ impl Packet {
                 // only PULL_DATA nad PUSH_DATA have MAC_IDs
                 gateway_mac: match id {
                     Identifier::PullData | Identifier::PushData | Identifier::TxAck => {
-                        println!("id {:?}", id);
-                        Some(gateway_mac(&buffer[3..11]))
+                        Some(gateway_mac(&buffer[4..12]))
                     }
                     _ => None,
                 },
@@ -74,15 +80,16 @@ impl Packet {
                     }
                     Identifier::PullResp => {
                         let json_str = std::str::from_utf8(&buffer[4..num_recv])?;
-                        PacketData::PullResp(serde_json::from_str(json_str)?)
+                        let ret = PacketData::PullResp(serde_json::from_str(json_str)?);
+                        ret
+
                     }
                     Identifier::PullAck => PacketData::PullAck,
                     Identifier::PushAck => PacketData::PushAck,
                     Identifier::TxAck => PacketData::TxAck,
                 },
             })
-        }
-        else {
+        } else {
             Err(Error::InvalidIdentifier.into())
         }
     }
@@ -108,9 +115,14 @@ impl Packet {
             w.write_all(&mac.bytes())?;
         };
 
-        if let PacketData::PushData(data)  = self.data {
+        if let PacketData::PushData(data) = &self.data {
             w.write_all(&serde_json::to_string(&data)?.as_bytes())?;
         }
+
+        if let PacketData::PullResp(data) = &self.data {
+            w.write_all(&serde_json::to_string(&data)?.as_bytes())?;
+        }
+
         Ok(w.position())
     }
 }
