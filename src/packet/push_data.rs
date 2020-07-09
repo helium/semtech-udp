@@ -12,7 +12,7 @@ Bytes  | Function
 4-11   | Gateway unique identifier (MAC address)
 12-end | JSON object, starting with {, ending with }, see section 4
  */
-use super::{write_preamble, Identifier, MacAddress, SerializablePacket};
+use super::{write_preamble, Identifier, MacAddress, SerializablePacket, push_ack};
 use serde::{Deserialize, Serialize};
 use std::{
     error::Error,
@@ -116,5 +116,13 @@ impl SerializablePacket for Packet {
 impl From<Packet> for super::Packet {
     fn from(packet: Packet) -> super::Packet {
         super::Packet::Up(super::Up::PushData(packet))
+    }
+}
+
+impl Packet {
+    pub fn into_ack(self) -> push_ack::Packet {
+        push_ack::Packet {
+            random_token: self.random_token,
+        }
     }
 }

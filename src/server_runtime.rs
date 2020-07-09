@@ -209,17 +209,28 @@ impl UdpRx {
                                     .send(Event::Packet(packet.clone()))
                                     .unwrap();
 
-                                if let Up::PullData(pull_data) = packet {
-                                    let mac = pull_data.gateway_mac;
-                                    // first send (mac, addr) to update map owned by UdpRuntimeTx
-                                    let client = (mac, src);
-                                    self.udp_tx_sender.send(UdpMessage::Client(client)).await?;
+                                match packet {
+                                    Up::PullData(pull_data) => {
+                                        let mac = pull_data.gateway_mac;
+                                        // first send (mac, addr) to update map owned by UdpRuntimeTx
+                                        let client = (mac, src);
+                                        self.udp_tx_sender.send(UdpMessage::Client(client)).await?;
 
-                                    // send the ack_packet
-                                    let ack_packet = pull_data.into_ack();
-                                    self.udp_tx_sender
-                                        .send(UdpMessage::Packet((ack_packet.into(), mac)))
-                                        .await?;
+                                        // send the ack_packet
+                                        let ack_packet = pull_data.into_ack();
+                                        self.udp_tx_sender
+                                            .send(UdpMessage::Packet((ack_packet.into(), mac)))
+                                            .await?;
+                                    }
+                                    Up::PushData(push_data) => {
+                                        let mac = push_data.gateway_mac;
+                                        // send the ack_packet
+                                        let ack_packet = push_data.into_ack();
+                                        self.udp_tx_sender
+                                            .send(UdpMessage::Packet((ack_packet.into(), mac)))
+                                            .await?;
+                                    }
+                                    _ => (),
                                 }
                             }
                             Packet::Down(_) => {
