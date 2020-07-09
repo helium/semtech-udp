@@ -13,5 +13,5 @@ before_script:
 script:
   - cargo fmt -- --check
   - cargo clippy -- --deny=clippy::all
-  - cargo build --verbose --all
+  - cargo build --verbose --all --features server
   - cargo test --verbose
