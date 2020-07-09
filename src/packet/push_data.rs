@@ -12,7 +12,7 @@ Bytes  | Function
 4-11   | Gateway unique identifier (MAC address)
 12-end | JSON object, starting with {, ending with }, see section 4
  */
-use super::{write_preamble, Identifier, MacAddress, SerializablePacket, push_ack};
+use super::{push_ack, write_preamble, Identifier, MacAddress, SerializablePacket};
 use serde::{Deserialize, Serialize};
 use std::{
     error::Error,
