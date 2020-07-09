@@ -1,4 +1,4 @@
-use super::{MacAddress, Packet, PacketData};
+use super::{MacAddress, Packet, Up, pull_resp::TxPk, pull_resp, parser::Parser, SerializablePacket};
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::net::udp::{RecvHalf, SendHalf};
 use tokio::net::UdpSocket;
@@ -17,7 +17,7 @@ type Request = (Packet, MacAddress);
 
 #[derive(Debug, Clone)]
 pub enum Event {
-    Packet(Packet),
+    Packet(Up),
     NewClient((MacAddress, SocketAddr)),
     UpdateClient((MacAddress, SocketAddr)),
 }
@@ -64,20 +64,24 @@ use rand::Rng;
 impl ClientRx {
     pub async fn send(
         &mut self,
-        mut packet: Packet,
+        txpk: TxPk,
         mac: MacAddress,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // assign random token
         let mut rng = rand::thread_rng();
 
-        let token = rng.gen();
-        packet.set_token(token);
-        self.sender.send((packet, mac)).await?;
+        let random_token = rng.gen();
+
+        let packet = pull_resp::Packet {
+            random_token,
+            data: pull_resp::Data::from_txpk(txpk)
+        };
+        self.sender.send((packet.into(), mac)).await?;
 
         loop {
             if let Event::Packet(packet) = self.receiver.recv().await? {
-                if let PacketData::TxAck = packet.data() {
-                    if packet.random_token == token {
+                if let Up::TxAck(ack) = packet {
+                    if ack.random_token == random_token {
                         return Ok(());
                     }
                 }
@@ -94,10 +98,10 @@ impl UdpRuntime {
 
     pub async fn send(
         &mut self,
-        packet: Packet,
+        txpk: TxPk,
         mac: MacAddress,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.rx.send(packet, mac).await
+        self.rx.send(txpk, mac).await
     }
 
     pub async fn recv(&mut self) -> Result<Event, broadcast::RecvError> {
@@ -196,34 +200,28 @@ impl UdpRx {
                     };
 
                     if let Some(packet) = packet {
-                        // echo all packets to client
-                        self.client_tx_sender
-                            .send(Event::Packet(packet.clone()))
-                            .unwrap();
+                        match packet {
+                            Packet::Up(packet) => {
 
-                        match packet.data() {
-                            // pull data is specially treated
-                            PacketData::PullData => {
-                                if let Some(mac) = packet.gateway_mac {
+                                // echo all packets to client
+                                self.client_tx_sender
+                                    .send(Event::Packet(packet.clone()))
+                                    .unwrap();
+
+                                if let Up::PullData(pull_data) = packet {
+                                    let mac = pull_data.gateway_mac;
                                     // first send (mac, addr) to update map owned by UdpRuntimeTx
-                                    let client = (mac, src);
+                                    let client = (mac , src);
                                     self.udp_tx_sender.send(UdpMessage::Client(client)).await?;
 
                                     // send the ack_packet
-                                    let mut ack_packet = Packet::from_data(PacketData::PullAck);
-                                    ack_packet.set_token(packet.random_token);
+                                    let ack_packet = pull_data.into_ack();
                                     self.udp_tx_sender
-                                        .send(UdpMessage::Packet((ack_packet, mac)))
+                                        .send(UdpMessage::Packet((ack_packet.into(), mac)))
                                         .await?;
-                                } else {
-                                    panic!("Received PullData packet with no gateway MAC!")
                                 }
                             }
-                            // PushData and TxAck are expected, but not specially handled
-                            PacketData::PushData(_) | PacketData::TxAck => (),
-                            PacketData::PushAck | PacketData::PullAck | PacketData::PullResp(_) => {
-                                panic!("Should not receive this frame from forwarder")
-                            }
+                            Packet::Down(_) => panic!("Should not receive this frame from forwarder"),
                         };
                     }
                 }

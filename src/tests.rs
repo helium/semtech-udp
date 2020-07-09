@@ -1,23 +1,22 @@
 use super::*;
-
+use super::packet::parser::Parser;
 #[test]
 fn test_pull_data() {
     let recv = [
         0x2, 0x9F, 0x92, 0x2, 0xAA, 0x55, 0x5A, 0x1, 0x2, 0x3, 0x4, 0x5,
     ];
     let packet = Packet::parse(&recv, recv.len()).unwrap();
-    if let PacketData::PullData = packet.data {
-        assert!(true);
+
+    if let Packet::Up(Up::PullData(packet)) = packet {
+        let mut buffer = [0; 512];
+        let written = packet.serialize(&mut buffer).unwrap();
+        assert_eq!(written, recv.len() as u64);
+
+        for i in 0..recv.len() {
+            assert_eq!(recv[i], buffer[i]);
+        }
     } else {
         assert!(false);
-    }
-
-    let mut buffer = [0; 512];
-    let written = packet.serialize(&mut buffer).unwrap();
-    assert_eq!(written, recv.len() as u64);
-
-    for i in 0..recv.len() {
-        assert_eq!(recv[i], buffer[i]);
     }
 }
 
@@ -42,16 +41,13 @@ fn test_push_data_rxpk() {
 
     let packet = Packet::parse(&recv, recv.len()).unwrap();
 
-    if let PacketData::PushData(_) = packet.data {
-        assert!(true);
+    if let Packet::Up(Up::PushData(packet)) = packet {
+        let mut buffer = [0; 512];
+        let written = packet.serialize(&mut buffer).unwrap();
+        let _packet = Packet::parse(&buffer, written as usize).unwrap();
     } else {
         assert!(false);
     }
-
-    let mut buffer = [0; 512];
-    let written = packet.serialize(&mut buffer).unwrap();
-
-    let _packet = Packet::parse(&buffer, written as usize).unwrap();
 }
 
 #[test]
@@ -69,32 +65,29 @@ fn test_push_data_stat() {
 
     let packet = Packet::parse(&recv, recv.len()).unwrap();
 
-    if let PacketData::PushData(_) = packet.data {
-        assert!(true);
+    if let Packet::Up(Up::PushData(packet)) = packet {
+        let _packet_first_read = Packet::parse(&recv, recv.len()).unwrap();
+
+        let mut buffer_first = [0; 512];
+        let written_first = packet.serialize(&mut buffer_first).unwrap();
+
+        let packet_second_read = Packet::parse(&buffer_first, written_first as usize).unwrap();
+        if let Packet::Up(Up::PushData(packet_second_read)) = packet_second_read {
+            let mut buffer_second = [0; 512];
+            let _written_second = packet_second_read.serialize(&mut buffer_second).unwrap();
+        } else {
+            assert!(false);
+        }
     } else {
         assert!(false);
     }
-
-    let _packet_first_read = Packet::parse(&recv, recv.len()).unwrap();
-
-    let mut buffer_first = [0; 512];
-    let written_first = packet.serialize(&mut buffer_first).unwrap();
-
-    let packet_second_read = Packet::parse(&buffer_first, written_first as usize).unwrap();
-
-    let mut buffer_second = [0; 512];
-    let _written_second = packet_second_read.serialize(&mut buffer_second).unwrap();
-
-    // assert_eq!(written_first, written_second);
-    // for i in 0..recv.len() {
-    //     assert_eq!(buffer_first[i], buffer_second[i]);
-    // }
 }
 
-use crate::types::StringOrNum;
+use crate::packet::StringOrNum;
 
 #[test]
 fn test_immediate_send() {
+    use crate::packet::pull_resp::TxPk;
     let json = "{\"codr\":\"4/5\",\"data\":\"QDDaAAHUbYkmAGY3AFAvfpbHJeCeuDu3xbCCHeg7YPOUJOfBCSc4Y3LtT4aToTGl9AYK4+NiALvTgey0M4ZJzh43vLaaXzFHko0jlb0CVeNgAtbTsAttQ\",\"datr\":\"SF10BW125\",\"freq\":904.1,\"imme\":true,\"ipol\":false,\"modu\":\"LORA\",\"powe\":27,\"rfch\":0,\"size\":87,\"tmst\":\"immediate\"}";
 
     let txpk: TxPk = serde_json::from_str(json).unwrap();
@@ -106,6 +99,7 @@ fn test_immediate_send() {
 }
 #[test]
 fn test_timed_send() {
+    use crate::packet::pull_resp::TxPk;
     let json = "{\"codr\":\"4/5\",\"data\":\"IHLF2EA+n8BFY1vrCU1k/Vg=\",\"datr\":\"SF10BW500\",\"freq\":926.9000244140625,\"imme\":false,\"ipol\":true,\"modu\":\"LORA\",\"powe\":27,\"rfch\":0,\"size\":17,\"tmst\":727050748}";
 
     let txpk: TxPk = serde_json::from_str(json).unwrap();
