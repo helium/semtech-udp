@@ -22,5 +22,10 @@ lorawan = "0.6.0"
 base64 = "0.12.0"
 
 [dependencies.tokio]
+optional = true
 version = "0.2.21"
 features = ["tcp", "udp", "rt-threaded", "macros", "sync", "time"]
+
+[features]
+default = []
+server = ["tokio"]

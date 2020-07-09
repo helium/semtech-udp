@@ -1,4 +1,6 @@
-use super::{MacAddress, Packet, Up, pull_resp::TxPk, pull_resp, parser::Parser, SerializablePacket};
+use super::{
+    parser::Parser, pull_resp, pull_resp::TxPk, MacAddress, Packet, SerializablePacket, Up,
+};
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::net::udp::{RecvHalf, SendHalf};
 use tokio::net::UdpSocket;
@@ -74,7 +76,7 @@ impl ClientRx {
 
         let packet = pull_resp::Packet {
             random_token,
-            data: pull_resp::Data::from_txpk(txpk)
+            data: pull_resp::Data::from_txpk(txpk),
         };
         self.sender.send((packet.into(), mac)).await?;
 
@@ -202,7 +204,6 @@ impl UdpRx {
                     if let Some(packet) = packet {
                         match packet {
                             Packet::Up(packet) => {
-
                                 // echo all packets to client
                                 self.client_tx_sender
                                     .send(Event::Packet(packet.clone()))
@@ -211,7 +212,7 @@ impl UdpRx {
                                 if let Up::PullData(pull_data) = packet {
                                     let mac = pull_data.gateway_mac;
                                     // first send (mac, addr) to update map owned by UdpRuntimeTx
-                                    let client = (mac , src);
+                                    let client = (mac, src);
                                     self.udp_tx_sender.send(UdpMessage::Client(client)).await?;
 
                                     // send the ack_packet
@@ -221,7 +222,9 @@ impl UdpRx {
                                         .await?;
                                 }
                             }
-                            Packet::Down(_) => panic!("Should not receive this frame from forwarder"),
+                            Packet::Down(_) => {
+                                panic!("Should not receive this frame from forwarder")
+                            }
                         };
                     }
                 }

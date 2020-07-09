@@ -3,6 +3,7 @@ extern crate arrayref;
 mod packet;
 pub use packet::*;
 
+#[cfg(feature = "server")]
 pub mod server_runtime;
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
-use super::*;
 use super::packet::parser::Parser;
+use super::*;
 #[test]
 fn test_pull_data() {
     let recv = [

@@ -21,7 +21,7 @@ route stays open for the server to be used at any time.
  */
 
 use super::super::simple_up_packet;
-use super::{write_preamble, Identifier, MacAddress, SerializablePacket, pull_ack};
+use super::{pull_ack, write_preamble, Identifier, MacAddress, SerializablePacket};
 use std::{
     error::Error,
     io::{Cursor, Write},

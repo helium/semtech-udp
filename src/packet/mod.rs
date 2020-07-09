@@ -29,22 +29,18 @@ pub enum Packet {
 }
 
 impl SerializablePacket for Packet {
-    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, Box<dyn Error>>{
+    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, Box<dyn Error>> {
         match self {
-            Packet::Up(up) => {
-                match up {
-                    Up::PushData(pkt) => pkt.serialize(buffer),
-                    Up::PullData(pkt) => pkt.serialize(buffer),
-                    Up::TxAck(pkt) => pkt.serialize(buffer),
-                }
-            }
-            Packet::Down(down) => {
-                match down {
-                    Down::PushAck(pkt) => pkt.serialize(buffer),
-                    Down::PullAck(pkt) => pkt.serialize(buffer),
-                    Down::PullResp(pkt) => pkt.serialize(buffer),
-                }
-            }
+            Packet::Up(up) => match up {
+                Up::PushData(pkt) => pkt.serialize(buffer),
+                Up::PullData(pkt) => pkt.serialize(buffer),
+                Up::TxAck(pkt) => pkt.serialize(buffer),
+            },
+            Packet::Down(down) => match down {
+                Down::PushAck(pkt) => pkt.serialize(buffer),
+                Down::PullAck(pkt) => pkt.serialize(buffer),
+                Down::PullResp(pkt) => pkt.serialize(buffer),
+            },
         }
     }
 }

@@ -1,6 +1,7 @@
 use semtech_udp::{
+    pull_resp,
     server_runtime::{Event, UdpRuntime},
-    Up as Packet, pull_resp, StringOrNum
+    StringOrNum, Up as Packet,
 };
 
 use std::net::SocketAddr;
@@ -51,17 +52,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         prea: None,
                                         ncrc: None,
                                     };
-                                    
+
                                     // this async call returns when TxAck is received
-                                    udp_runtime
-                                        .send(txpk, packet.gateway_mac)
-                                        .await?;
+                                    udp_runtime.send(txpk, packet.gateway_mac).await?;
                                 }
                             }
                         }
                         // these are generally uninteresting but available for debug
                         _ => println!("{:?}", packet),
-
                     }
                 }
             }

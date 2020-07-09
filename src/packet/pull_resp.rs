@@ -30,9 +30,7 @@ pub struct Data {
 
 impl Data {
     pub fn from_txpk(txpk: TxPk) -> Data {
-        Data {
-            txpk,
-        }
+        Data { txpk }
     }
 }
 
