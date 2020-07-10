@@ -52,6 +52,16 @@ pub enum Up {
     TxAck(tx_ack::Packet),
 }
 
+impl Up {
+    pub fn set_gateway_mac(&mut self, mac: MacAddress) {
+        match self {
+            Up::PushData(push_data) => push_data.gateway_mac = mac,
+            Up::PullData(pull_data) => pull_data.gateway_mac = mac,
+            Up::TxAck(tx_ack) => tx_ack.gateway_mac = mac,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Down {
     PushAck(push_ack::Packet),

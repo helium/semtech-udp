@@ -26,10 +26,20 @@ use std::{
     error::Error,
     io::{Cursor, Write},
 };
+
 #[derive(Debug, Clone)]
 pub struct Packet {
     pub random_token: u16,
     pub gateway_mac: MacAddress,
+}
+
+impl Default for Packet {
+    fn default() -> Packet {
+        Packet {
+            random_token: 0,
+            gateway_mac: MacAddress { bytes: [0; 8] },
+        }
+    }
 }
 
 simple_up_packet!(Packet, Identifier::PullData);

@@ -10,7 +10,7 @@ Bytes  | Function
 3      | PULL_RESP identifier 0x03
 4-end  | JSON object, starting with {, ending with }, see section 6
  */
-use super::{write_preamble, Identifier, SerializablePacket, StringOrNum};
+use super::{tx_ack, write_preamble, Identifier, MacAddress, SerializablePacket, StringOrNum};
 use serde::{Deserialize, Serialize};
 use std::{
     error::Error,
@@ -21,6 +21,19 @@ use std::{
 pub struct Packet {
     pub random_token: u16,
     pub data: Data,
+}
+
+impl Packet {
+    pub fn into_ack_for_gateway(self, gateway_mac: MacAddress) -> tx_ack::Packet {
+        tx_ack::Packet {
+            gateway_mac,
+            random_token: self.random_token,
+        }
+    }
+
+    pub fn into_ack(self) -> tx_ack::Packet {
+        self.into_ack_for_gateway(MacAddress { bytes: [0; 8] })
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -26,6 +26,20 @@ pub struct Packet {
     pub data: Data,
 }
 
+impl Packet {
+    pub fn from_rxpk(rxpk: RxPk) -> Packet {
+        let rxpk = vec![rxpk];
+        Packet {
+            random_token: 0,
+            gateway_mac: MacAddress { bytes: [0; 8] },
+            data: Data {
+                rxpk: Some(rxpk),
+                stat: None,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Data {
     #[serde(skip_serializing_if = "Option::is_none")]
