@@ -105,3 +105,9 @@ impl From<Packet> for super::Packet {
         super::Packet::Down(super::Down::PullResp(Box::new(packet)))
     }
 }
+
+impl From<Box<Packet>> for super::Packet {
+    fn from(packet: Box<Packet>) -> super::Packet {
+        super::Packet::Down(super::Down::PullResp(packet))
+    }
+}
