@@ -111,4 +111,3 @@ impl From<Box<Packet>> for super::Packet {
         super::Packet::Down(super::Down::PullResp(packet))
     }
 }
-
