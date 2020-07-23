@@ -193,54 +193,40 @@ impl UdpRx {
     pub async fn run(mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut buf = vec![0u8; 1024];
         loop {
-            match self.socket_receiver.recv_from(&mut buf).await {
-                Ok((n, src)) => {
-                    let packet = if let Ok(packet) = Packet::parse(&buf[0..n], n) {
-                        Some(packet)
-                    } else {
-                        None
-                    };
+            let (n, src) = self.socket_receiver.recv_from(&mut buf).await?;
+            match Packet::parse(&buf[0..n]).ok() {
+                Some(Packet::Down(_)) => panic!("Should not receive this frame from forwarder"),
+                Some(Packet::Up(packet)) => {
+                    // echo all packets to client
+                    self.client_tx_sender
+                        .send(Event::Packet(packet.clone()))
+                        .unwrap();
 
-                    if let Some(packet) = packet {
-                        match packet {
-                            Packet::Up(packet) => {
-                                // echo all packets to client
-                                self.client_tx_sender
-                                    .send(Event::Packet(packet.clone()))
-                                    .unwrap();
+                    match packet {
+                        Up::PullData(pull_data) => {
+                            let mac = pull_data.gateway_mac;
+                            // first send (mac, addr) to update map owned by UdpRuntimeTx
+                            let client = (mac, src);
+                            self.udp_tx_sender.send(UdpMessage::Client(client)).await?;
 
-                                match packet {
-                                    Up::PullData(pull_data) => {
-                                        let mac = pull_data.gateway_mac;
-                                        // first send (mac, addr) to update map owned by UdpRuntimeTx
-                                        let client = (mac, src);
-                                        self.udp_tx_sender.send(UdpMessage::Client(client)).await?;
-
-                                        // send the ack_packet
-                                        let ack_packet = pull_data.into_ack();
-                                        self.udp_tx_sender
-                                            .send(UdpMessage::Packet((ack_packet.into(), mac)))
-                                            .await?;
-                                    }
-                                    Up::PushData(push_data) => {
-                                        let mac = push_data.gateway_mac;
-                                        // send the ack_packet
-                                        let ack_packet = push_data.into_ack();
-                                        self.udp_tx_sender
-                                            .send(UdpMessage::Packet((ack_packet.into(), mac)))
-                                            .await?;
-                                    }
-                                    _ => (),
-                                }
-                            }
-                            Packet::Down(_) => {
-                                panic!("Should not receive this frame from forwarder")
-                            }
-                        };
+                            // send the ack_packet
+                            let ack_packet = pull_data.into_ack();
+                            self.udp_tx_sender
+                                .send(UdpMessage::Packet((ack_packet.into(), mac)))
+                                .await?;
+                        }
+                        Up::PushData(push_data) => {
+                            let mac = push_data.gateway_mac;
+                            // send the ack_packet
+                            let ack_packet = push_data.into_ack();
+                            self.udp_tx_sender
+                                .send(UdpMessage::Packet((ack_packet.into(), mac)))
+                                .await?;
+                        }
+                        _ => (),
                     }
                 }
-                Err(e) => return Err(e.into()),
-            }
+            };
         }
     }
 }

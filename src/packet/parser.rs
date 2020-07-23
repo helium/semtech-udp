@@ -11,11 +11,11 @@ pub fn gateway_mac(buffer: &[u8]) -> MacAddress {
 }
 
 pub trait Parser {
-    fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Box<dyn stdError>>;
+    fn parse(buffer: &[u8]) -> std::result::Result<Packet, Box<dyn stdError>>;
 }
 
 impl Parser for Packet {
-    fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Box<dyn stdError>> {
+    fn parse(buffer: &[u8]) -> std::result::Result<Packet, Box<dyn stdError>> {
         if buffer[0] != PROTOCOL_VERSION {
             Err(Error::InvalidProtocolVersion.into())
         } else if let Ok(id) = Identifier::try_from(buffer[3]) {
@@ -33,7 +33,7 @@ impl Parser for Packet {
                 }
                 Identifier::PushData => {
                     let gateway_mac = gateway_mac(&buffer[4..12]);
-                    let json_str = std::str::from_utf8(&buffer[12..num_recv])?;
+                    let json_str = std::str::from_utf8(&buffer[12..buffer.len()])?;
                     let data = serde_json::from_str(json_str)?;
                     push_data::Packet {
                         random_token,
@@ -54,7 +54,7 @@ impl Parser for Packet {
                 Identifier::PushAck => push_ack::Packet { random_token }.into(),
                 Identifier::PullAck => pull_ack::Packet { random_token }.into(),
                 Identifier::PullResp => {
-                    let json_str = std::str::from_utf8(&buffer[4..num_recv])?;
+                    let json_str = std::str::from_utf8(&buffer[4..buffer.len()])?;
                     let data = serde_json::from_str(json_str)?;
                     pull_resp::Packet { random_token, data }.into()
                 }
