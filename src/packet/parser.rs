@@ -44,9 +44,16 @@ impl Parser for Packet {
                 }
                 Identifier::TxAck => {
                     let gateway_mac = gateway_mac(&buffer[4..12]);
+                    let data = if num_recv > 12 {
+                        let json_str = std::str::from_utf8(&buffer[12..num_recv])?;
+                        Some(serde_json::from_str(json_str).unwrap())
+                    } else {
+                        None
+                    };
                     tx_ack::Packet {
                         random_token,
                         gateway_mac,
+                        data,
                     }
                     .into()
                 }

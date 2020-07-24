@@ -8,6 +8,10 @@ license = "Apache-2.0"
 keywords = ["lorawan", "iot", "lpwan", "semtech"]
 repository = "https://github.com/helium/semtech-udp/"
 
+[[example]]
+name = "server"
+required-features = ["server"]
+
 [dependencies]
 num_enum = "0.4"
 arrayref = "0.3"
@@ -29,3 +33,4 @@ features = ["tcp", "udp", "rt-threaded", "macros", "sync", "time"]
 [features]
 default = []
 server = ["tokio"]
+
