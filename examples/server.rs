@@ -3,17 +3,20 @@ use semtech_udp::{
     server_runtime::{Event, UdpRuntime},
     StringOrNum, Up as Packet,
 };
-
 use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("Starting server!");
     let addr = SocketAddr::from(([0, 0, 0, 0], 1691));
     let mut udp_runtime = UdpRuntime::new(addr).await?;
-
     loop {
         if let Ok(event) = udp_runtime.recv().await {
             match event {
+                Event::UnableToParseUdpFrame(buf) => {
+                    println!("Semtech UDP Parsing Error");
+                    println!("UDP data: {:?}", buf);
+                }
                 Event::NewClient((mac, addr)) => {
                     println!("New packet forwarder client: {}, {}", mac, addr);
                 }
@@ -23,22 +26,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Event::Packet(packet) => {
                     match packet {
                         Packet::PushData(packet) => {
-                            if let Some(stat) = &packet.data.stat {
-                                println!("Stat report: {:?}", stat);
-                            }
                             if let Some(rxpk) = &packet.data.rxpk {
                                 println!("Received packets:");
-                                for recived_packet in rxpk {
-                                    println!("\t{:?}", recived_packet);
+                                for received_packet in rxpk {
+                                    println!("\t{:?}", received_packet);
+
                                     let buffer = [1, 2, 3, 4];
                                     let size = buffer.len() as u64;
                                     let data = base64::encode(buffer);
-                                    let tmst = StringOrNum::N(recived_packet.tmst + 1_000_000);
+                                    let tmst = StringOrNum::N(received_packet.tmst + 1_000_000);
 
                                     let txpk = pull_resp::TxPk {
                                         imme: false,
                                         tmst,
-                                        freq: 902_800_000.0,
+                                        freq: 902.800_000,
                                         rfch: 0,
                                         powe: 27,
                                         modu: "LORA".to_string(),
@@ -54,11 +55,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     };
 
                                     // this async call returns when TxAck is received
-                                    udp_runtime.send(txpk, packet.gateway_mac).await?;
+                                    if let Err(e) = udp_runtime.send(txpk, packet.gateway_mac).await
+                                    {
+                                        println!("Warning: error on send {}", e);
+                                    }
                                 }
                             }
                         }
-                        // these are generally uninteresting but available for debug
                         _ => println!("{:?}", packet),
                     }
                 }

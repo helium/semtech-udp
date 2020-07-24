@@ -1,5 +1,5 @@
 use super::{
-    parser::Parser, pull_resp, pull_resp::TxPk, MacAddress, Packet, SerializablePacket, Up,
+    parser::Parser, pull_resp, pull_resp::TxPk, Down, MacAddress, Packet, SerializablePacket, Up,
 };
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::net::udp::{RecvHalf, SendHalf};
@@ -11,7 +11,8 @@ use tokio::sync::{
 
 #[derive(Debug)]
 enum UdpMessage {
-    Packet((Packet, MacAddress)),
+    PacketByMac((Packet, MacAddress)),
+    PacketBySocket((Packet, SocketAddr)),
     Client((MacAddress, SocketAddr)),
 }
 
@@ -22,6 +23,7 @@ pub enum Event {
     Packet(Up),
     NewClient((MacAddress, SocketAddr)),
     UpdateClient((MacAddress, SocketAddr)),
+    UnableToParseUdpFrame(Vec<u8>),
 }
 
 // receives requests from clients
@@ -70,21 +72,26 @@ impl ClientRx {
         mac: MacAddress,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // assign random token
-        let mut rng = rand::thread_rng();
+        let random_token = rand::thread_rng().gen();
 
-        let random_token = rng.gen();
-
+        // create pull_resp frame with the data
         let packet = pull_resp::Packet {
             random_token,
             data: pull_resp::Data::from_txpk(txpk),
         };
+        // send it to UdpTx channel
         self.sender.send((packet.into(), mac)).await?;
 
+        // loop over responses until the TxAck is received
         loop {
             if let Event::Packet(packet) = self.receiver.recv().await? {
                 if let Up::TxAck(ack) = packet {
                     if ack.random_token == random_token {
-                        return Ok(());
+                        return if let Some(error) = ack.get_error() {
+                            Err(error.into())
+                        } else {
+                            Ok(())
+                        };
                     }
                 }
             }
@@ -182,7 +189,7 @@ impl ClientRxTranslator {
             let msg = self.receiver.recv().await;
             if let Some((packet, mac)) = msg {
                 self.udp_tx_sender
-                    .send(UdpMessage::Packet((packet, mac)))
+                    .send(UdpMessage::PacketByMac((packet, mac)))
                     .await?;
             }
         }
@@ -194,10 +201,16 @@ impl UdpRx {
         let mut buf = vec![0u8; 1024];
         loop {
             match self.socket_receiver.recv_from(&mut buf).await {
+                Err(e) => return Err(e.into()),
                 Ok((n, src)) => {
                     let packet = if let Ok(packet) = Packet::parse(&buf[0..n], n) {
                         Some(packet)
                     } else {
+                        let mut vec = Vec::new();
+                        vec.extend_from_slice(&buf);
+                        self.client_tx_sender
+                            .send(Event::UnableToParseUdpFrame(vec))
+                            .unwrap();
                         None
                     };
 
@@ -218,16 +231,21 @@ impl UdpRx {
 
                                         // send the ack_packet
                                         let ack_packet = pull_data.into_ack();
-                                        self.udp_tx_sender
-                                            .send(UdpMessage::Packet((ack_packet.into(), mac)))
-                                            .await?;
+                                        let mut udp_tx = self.udp_tx_sender.clone();
+                                        udp_tx
+                                            .send(UdpMessage::PacketByMac((ack_packet.into(), mac)))
+                                            .await
+                                            .unwrap()
                                     }
                                     Up::PushData(push_data) => {
-                                        let mac = push_data.gateway_mac;
+                                        let socket_addr = src;
                                         // send the ack_packet
                                         let ack_packet = push_data.into_ack();
                                         self.udp_tx_sender
-                                            .send(UdpMessage::Packet((ack_packet.into(), mac)))
+                                            .send(UdpMessage::PacketBySocket((
+                                                ack_packet.into(),
+                                                socket_addr,
+                                            )))
                                             .await?;
                                     }
                                     _ => (),
@@ -239,7 +257,6 @@ impl UdpRx {
                         };
                     }
                 }
-                Err(e) => return Err(e.into()),
             }
         }
     }
@@ -252,12 +269,23 @@ impl UdpTx {
             let msg = self.receiver.recv().await;
             if let Some(msg) = msg {
                 match msg {
-                    UdpMessage::Packet((packet, mac)) => {
+                    UdpMessage::PacketByMac((packet, mac)) => {
                         if let Some(addr) = self.clients.get(&mac) {
                             let n = packet.serialize(&mut buf)? as usize;
                             let _sent = self.socket_sender.send_to(&buf[..n], addr).await?;
-                            //buf.clear();
+                        } else {
+                            if let Packet::Down(Down::PullResp(pull_resp)) = packet {
+                                self.client_tx_sender
+                                    .send(Event::Packet(Up::TxAck(
+                                        pull_resp.into_nack_for_client(mac),
+                                    )))
+                                    .unwrap();
+                            }
                         }
+                    }
+                    UdpMessage::PacketBySocket((packet, addr)) => {
+                        let n = packet.serialize(&mut buf)? as usize;
+                        let _sent = self.socket_sender.send_to(&buf[..n], &addr).await?;
                     }
                     UdpMessage::Client((mac, addr)) => {
                         // tell user if same MAC has new IP

@@ -10,7 +10,10 @@ Bytes  | Function
 3      | PULL_RESP identifier 0x03
 4-end  | JSON object, starting with {, ending with }, see section 6
  */
-use super::{tx_ack, write_preamble, Identifier, MacAddress, SerializablePacket, StringOrNum};
+use super::{
+    tx_ack, tx_ack::TxPkNack, write_preamble, Identifier, MacAddress, SerializablePacket,
+    StringOrNum,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     error::Error,
@@ -28,6 +31,15 @@ impl Packet {
         tx_ack::Packet {
             gateway_mac,
             random_token: self.random_token,
+            data: None,
+        }
+    }
+
+    pub fn into_nack_for_client(self, gateway_mac: MacAddress) -> tx_ack::Packet {
+        tx_ack::Packet {
+            gateway_mac,
+            random_token: self.random_token,
+            data: Some(TxPkNack::new(tx_ack::Error::UNKNOWN_MAC)),
         }
     }
 
