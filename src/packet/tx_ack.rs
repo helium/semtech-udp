@@ -16,7 +16,7 @@ Bytes  | Function
 12-end | [optional] JSON object, starting with {, ending with }, see section 6
 
 */
-use super::{write_preamble, Identifier, MacAddress, SerializablePacket};
+use super::{write_preamble, Error as PktError, Identifier, MacAddress, SerializablePacket};
 use serde::{Deserialize, Serialize};
 use std::{
     error::Error as stdError,
@@ -46,10 +46,12 @@ impl Packet {
 }
 
 impl SerializablePacket for Packet {
-    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, Box<dyn stdError>> {
+    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, PktError> {
         let mut w = Cursor::new(buffer);
         write_preamble(&mut w, self.random_token)?;
         w.write_all(&[Identifier::TxAck as u8])?;
+        w.write_all(&self.gateway_mac.bytes())?;
+
         if let Some(data) = &self.data {
             w.write_all(&serde_json::to_string(&data)?.as_bytes())?;
         }

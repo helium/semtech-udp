@@ -1,6 +1,5 @@
 use super::*;
 use std::convert::TryFrom;
-use std::error::Error as stdError;
 
 fn random_token(buffer: &[u8]) -> u16 {
     (buffer[1] as u16) << 8 | buffer[2] as u16
@@ -11,13 +10,13 @@ pub fn gateway_mac(buffer: &[u8]) -> MacAddress {
 }
 
 pub trait Parser {
-    fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Box<dyn stdError>>;
+    fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Error>;
 }
 
 impl Parser for Packet {
-    fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Box<dyn stdError>> {
+    fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Error> {
         if buffer[0] != PROTOCOL_VERSION {
-            Err(Error::InvalidProtocolVersion.into())
+            Err(Error::InvalidProtocolVersion)
         } else if let Ok(id) = Identifier::try_from(buffer[3]) {
             // all packets have random_token
             let random_token = random_token(buffer);
@@ -67,7 +66,7 @@ impl Parser for Packet {
                 }
             })
         } else {
-            Err(Error::InvalidIdentifier.into())
+            Err(Error::InvalidIdentifier)
         }
     }
 }
@@ -78,6 +77,20 @@ use std::{fmt, str};
 pub enum Error {
     InvalidProtocolVersion,
     InvalidIdentifier,
+    Utf8(std::str::Utf8Error),
+    Json,
+}
+
+impl From<std::str::Utf8Error> for Error {
+    fn from(err: std::str::Utf8Error) -> Error {
+        Error::Utf8(err)
+    }
+}
+
+impl From<serde_json::error::Error> for Error {
+    fn from(_: serde_json::error::Error) -> Error {
+        Error::Json
+    }
 }
 
 impl fmt::Display for Error {
@@ -89,6 +102,8 @@ impl fmt::Display for Error {
             Error::InvalidIdentifier => {
                 write!(f, "Invalid message identifier (byte 3 in UDP frame)")
             }
+            Error::Utf8(err) => write!(f, "UTF-8 from bytes parsing error: {}", err),
+            Error::Json => write!(f, "Json Deserialization Error"),
         }
     }
 }
@@ -98,6 +113,8 @@ impl stdError for Error {
         match self {
             Error::InvalidProtocolVersion => "Invalid protocol version (byte 0 in UDP frame)",
             Error::InvalidIdentifier => "Invalid message identifier (byte 3 in UDP frame)",
+            Error::Utf8(_err) => "UTF-8 from bytes parsing error",
+            Error::Json => "Json Deserialization Error",
         }
     }
 

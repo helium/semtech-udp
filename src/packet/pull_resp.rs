@@ -11,14 +11,11 @@ Bytes  | Function
 4-end  | JSON object, starting with {, ending with }, see section 6
  */
 use super::{
-    tx_ack, tx_ack::TxPkNack, write_preamble, Identifier, MacAddress, SerializablePacket,
-    StringOrNum,
+    tx_ack, tx_ack::TxPkNack, write_preamble, Error as PktError, Identifier, MacAddress,
+    SerializablePacket, StringOrNum,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    error::Error,
-    io::{Cursor, Write},
-};
+use std::io::{Cursor, Write};
 
 #[derive(Debug, Clone)]
 pub struct Packet {
@@ -103,7 +100,7 @@ pub struct TxPk {
 }
 
 impl SerializablePacket for Packet {
-    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, Box<dyn Error>> {
+    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, PktError> {
         let mut w = Cursor::new(buffer);
         write_preamble(&mut w, self.random_token)?;
         w.write_all(&[Identifier::PullResp as u8])?;
