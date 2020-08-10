@@ -1,7 +1,26 @@
 use num_enum::TryFromPrimitive;
+use std::error::Error as stdError;
 use std::fmt;
 
 const PROTOCOL_VERSION: u8 = 2;
+
+#[derive(Debug)]
+pub enum Error {
+    Io(std::io::Error),
+    JsonSerialize(serde_json::error::Error),
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Error {
+        Error::Io(err)
+    }
+}
+
+impl From<serde_json::error::Error> for Error {
+    fn from(err: serde_json::error::Error) -> Error {
+        Error::JsonSerialize(err)
+    }
+}
 
 #[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
 #[repr(u8)]
@@ -29,7 +48,7 @@ pub enum Packet {
 }
 
 impl SerializablePacket for Packet {
-    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, Box<dyn Error>> {
+    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, Error> {
         match self {
             Packet::Up(up) => match up {
                 Up::PushData(pkt) => pkt.serialize(buffer),
@@ -101,10 +120,7 @@ impl fmt::Display for MacAddress {
     }
 }
 
-use std::{
-    error::Error,
-    io::{self, Cursor, Write},
-};
+use std::io::{self, Cursor, Write};
 
 fn write_preamble(w: &mut Cursor<&mut [u8]>, token: u16) -> Result<(), io::Error> {
     w.write_all(&[PROTOCOL_VERSION, (token >> 8) as u8, token as u8])
@@ -118,7 +134,7 @@ pub enum StringOrNum {
 }
 
 pub trait SerializablePacket {
-    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, Box<dyn Error>>;
+    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, Error>;
 }
 
 #[macro_export]
@@ -126,7 +142,7 @@ pub trait SerializablePacket {
 macro_rules! simple_up_packet {
     ($packet:ident,$name:expr) => {
         impl SerializablePacket for $packet {
-            fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, Box<dyn Error>> {
+            fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, PktError> {
                 let mut w = Cursor::new(buffer);
                 write_preamble(&mut w, self.random_token)?;
                 w.write_all(&[$name as u8])?;
@@ -142,7 +158,7 @@ macro_rules! simple_up_packet {
 macro_rules! simple_down_packet {
     ($packet:ident,$name:expr) => {
         impl SerializablePacket for $packet {
-            fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, Box<dyn Error>> {
+            fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, PktError> {
                 let mut w = Cursor::new(buffer);
                 write_preamble(&mut w, self.random_token)?;
                 w.write_all(&[$name as u8])?;
@@ -150,4 +166,21 @@ macro_rules! simple_down_packet {
             }
         }
     };
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::Io(err) => write!(f, "SemtechUDP::Packet::Error::Io({})", err),
+            Error::JsonSerialize(err) => {
+                write!(f, "SemtechUDP::Packet::Error::JsonSerialize({})", err)
+            }
+        }
+    }
+}
+
+impl stdError for Error {
+    fn source(&self) -> Option<&(dyn stdError + 'static)> {
+        Some(self)
+    }
 }

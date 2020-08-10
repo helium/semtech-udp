@@ -21,11 +21,10 @@ route stays open for the server to be used at any time.
  */
 
 use super::super::simple_up_packet;
-use super::{pull_ack, write_preamble, Identifier, MacAddress, SerializablePacket};
-use std::{
-    error::Error,
-    io::{Cursor, Write},
+use super::{
+    pull_ack, write_preamble, Error as PktError, Identifier, MacAddress, SerializablePacket,
 };
+use std::io::{Cursor, Write};
 
 #[derive(Debug, Clone)]
 pub struct Packet {

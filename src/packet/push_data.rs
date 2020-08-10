@@ -12,12 +12,11 @@ Bytes  | Function
 4-11   | Gateway unique identifier (MAC address)
 12-end | JSON object, starting with {, ending with }, see section 4
  */
-use super::{push_ack, write_preamble, Identifier, MacAddress, SerializablePacket};
-use serde::{Deserialize, Serialize};
-use std::{
-    error::Error,
-    io::{Cursor, Write},
+use super::{
+    push_ack, write_preamble, Error as PktError, Identifier, MacAddress, SerializablePacket,
 };
+use serde::{Deserialize, Serialize};
+use std::io::{Cursor, Write};
 
 #[derive(Debug, Clone)]
 pub struct Packet {
@@ -117,7 +116,7 @@ pub struct Stat {
 }
 
 impl SerializablePacket for Packet {
-    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, Box<dyn Error>> {
+    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, PktError> {
         let mut w = Cursor::new(buffer);
         write_preamble(&mut w, self.random_token)?;
         w.write_all(&[Identifier::PushData as u8])?;
