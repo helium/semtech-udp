@@ -4,12 +4,15 @@ use semtech_udp::{
     StringOrNum, Up as Packet,
 };
 use std::net::SocketAddr;
+use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Starting server!");
-    let addr = SocketAddr::from(([0, 0, 0, 0], 1691));
+    let cli = Opt::from_args();
+    let addr = SocketAddr::from(([0, 0, 0, 0], cli.port));
+    println!("Starting server: {}", addr);
     let mut udp_runtime = UdpRuntime::new(addr).await?;
+    println!("Ready for clients");
     loop {
         if let Ok(event) = udp_runtime.recv().await {
             match event {
@@ -68,4 +71,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
+}
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "virtual-lorawan-device", about = "LoRaWAN test device utility")]
+pub struct Opt {
+    /// port to run service on
+    #[structopt(short, long, default_value = "1680")]
+    pub port: u16,
 }
