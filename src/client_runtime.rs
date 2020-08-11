@@ -94,7 +94,7 @@ impl UdpRuntime {
         // spawn a timer for telling tx to send a PullReq frame
         tokio::spawn(async move {
             loop {
-                let packet = pull_data::Packet::default();
+                let packet = pull_data::Packet::new(rand::random());
                 if let Err(e) = poll_sender.send(packet.into()).await {
                     panic!("UdpRuntime error from sending PullData {}", e)
                 }
@@ -110,7 +110,7 @@ impl UdpRuntime {
         local: SocketAddr,
         host: SocketAddr,
     ) -> Result<UdpRuntime, Box<dyn std::error::Error>> {
-        let mut socket = UdpSocket::bind(&local).await?;
+        let socket = UdpSocket::bind(&local).await?;
         // "connecting" filters for only frames from the server
         socket.connect(host).await?;
         let (rx_sender, _) = broadcast::channel(100);
@@ -153,7 +153,10 @@ impl UdpRuntimeRx {
                                 // provide ACK
                                 self.udp_sender.send(pull_resp.into_ack().into()).await?;
                             }
-                            Down::PullAck(_) | Down::PushAck(_) => (),
+                            Down::PullAck(_) | Down::PushAck(_) => {
+                                // send downlinks to LoRaWAN layer
+                                self.sender.send(Packet::Down(down.clone())).unwrap();
+                            }
                         },
                     }
                 }

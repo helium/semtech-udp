@@ -1,4 +1,4 @@
-use semtech_udp::{client_runtime::UdpRuntime, pull_resp, StringOrNum, Up as Packet};
+use semtech_udp::client_runtime::UdpRuntime;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use structopt::StructOpt;
@@ -9,9 +9,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let outbound = SocketAddr::from(([0, 0, 0, 0], cli.port));
     let host = SocketAddr::from_str(cli.host.as_str())?;
     println!("Connecting to server {} from port {}", cli.host, cli.port);
-    let mut udp_runtime = UdpRuntime::new([0, 0, 0, 0, 1, 2, 3, 4], outbound, host).await?;
+    let udp_runtime = UdpRuntime::new([0, 0, 0, 0, 1, 2, 3, 4], outbound, host).await?;
 
-    let (mut receiver, sender) = (udp_runtime.subscribe(), udp_runtime.publish_to());
+    let (mut receiver, _sender) = (udp_runtime.subscribe(), udp_runtime.publish_to());
 
     tokio::spawn(async move {
         udp_runtime.run().await.unwrap();
@@ -21,8 +21,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let msg = receiver.recv().await?;
         println!("msg: {:?}", msg);
     }
-
-    Ok(())
 }
 
 #[derive(Debug, StructOpt)]
