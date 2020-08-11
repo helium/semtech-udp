@@ -11,7 +11,6 @@ use tokio::sync::{
     broadcast,
     mpsc::{self, Receiver, Sender},
 };
-use rand::Rng;
 
 pub type RxMessage = Packet;
 pub type TxMessage = Packet;
@@ -24,7 +23,7 @@ struct UdpRuntimeRx {
 
 #[derive(Debug)]
 pub enum Error {
-    SemtechUdpSerialize(super::Packet::Error),
+    SemtechUdpSerialize(super::Error),
     SemtechUdpDeserialize(super::parser::Error),
     SendError(tokio::sync::mpsc::error::SendError<TxMessage>),
 }
@@ -42,7 +41,7 @@ impl From<tokio::sync::mpsc::error::SendError<TxMessage>> for Error {
 }
 
 impl From<super::Error> for Error {
-    fn from(err: super::Packet::Error) -> Error {
+    fn from(err: super::Error) -> Error {
         Error::SemtechUdpSerialize(err)
     }
 }
@@ -169,7 +168,6 @@ impl UdpRuntimeRx {
 
 impl UdpRuntimeTx {
     pub async fn run(mut self) -> Result<(), Error> {
-        let mut rng = rand::thread_rng();
         let mut buf = vec![0u8; 1024];
         loop {
             let tx = self.receiver.recv().await;
@@ -180,11 +178,11 @@ impl UdpRuntimeTx {
 
                         match up {
                             Up::PushData(ref mut push_data) => {
-                                push_data.random_token = rng.gen();
+                                push_data.random_token = rand::random();
                             }
                             Up::PullData(_) => (),
                             Up::TxAck(ref mut tx_ack) => {
-                                tx_ack.random_token =  rng.gen();
+                                tx_ack.random_token = rand::random();
                             }
                         }
                     }
