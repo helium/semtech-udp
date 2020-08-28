@@ -50,6 +50,13 @@ impl From<Packet> for super::Packet {
 }
 
 impl Packet {
+    pub fn new(random_token: u16) -> Packet {
+        Packet {
+            random_token,
+            gateway_mac: MacAddress { bytes: [0; 8] },
+        }
+    }
+
     pub fn into_ack(self) -> pull_ack::Packet {
         pull_ack::Packet {
             random_token: self.random_token,

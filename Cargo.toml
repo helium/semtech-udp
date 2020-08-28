@@ -12,6 +12,10 @@ repository = "https://github.com/helium/semtech-udp/"
 name = "server"
 required-features = ["server"]
 
+[[example]]
+name = "client"
+required-features = ["client"]
+
 [dependencies]
 num_enum = "0.4"
 arrayref = "0.3"
@@ -34,4 +38,5 @@ features = ["tcp", "udp", "rt-threaded", "macros", "sync", "time"]
 [features]
 default = []
 server = ["tokio"]
+client = ["tokio"]
 
