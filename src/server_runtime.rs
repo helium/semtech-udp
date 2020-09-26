@@ -28,14 +28,14 @@ pub enum Event {
 
 // receives requests from clients
 // dispatches them to UdpTx
-struct ClientRx {
+pub struct ClientTx {
     sender: Sender<Request>,
     receiver: broadcast::Receiver<Event>,
 }
 
 // sends packets to clients
 // broadcast enables many clients
-type ClientTx = broadcast::Receiver<Event>;
+pub type ClientRx = broadcast::Receiver<Event>;
 
 // translates message type such as to restrict
 // public message
@@ -60,12 +60,12 @@ struct UdpTx {
 }
 
 pub struct UdpRuntime {
-    tx: ClientTx,
     rx: ClientRx,
+    tx: ClientTx,
 }
 use rand::Rng;
 
-impl ClientRx {
+impl ClientTx {
     pub async fn send(
         &mut self,
         txpk: TxPk,
@@ -100,9 +100,8 @@ impl ClientRx {
 }
 
 impl UdpRuntime {
-    #[allow(dead_code)]
-    fn split(self) -> (ClientTx, ClientRx) {
-        (self.tx, self.rx)
+    pub fn split(self) -> (ClientRx, ClientTx) {
+        (self.rx, self.tx)
     }
 
     pub async fn send(
@@ -110,11 +109,11 @@ impl UdpRuntime {
         txpk: TxPk,
         mac: MacAddress,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.rx.send(txpk, mac).await
+        self.tx.send(txpk, mac).await
     }
 
     pub async fn recv(&mut self) -> Result<Event, broadcast::RecvError> {
-        self.tx.recv().await
+        self.rx.recv().await
     }
 
     pub async fn new(addr: SocketAddr) -> Result<UdpRuntime, Box<dyn std::error::Error>> {
@@ -128,7 +127,7 @@ impl UdpRuntime {
         // receives requests from clients
         let (client_rx_sender, client_rx_receiver) = mpsc::channel(100);
 
-        let client_rx = ClientRx {
+        let client_rx = ClientTx {
             sender: client_rx_sender,
             receiver: client_tx_sender.subscribe(),
         };
@@ -177,8 +176,8 @@ impl UdpRuntime {
         });
 
         Ok(UdpRuntime {
-            tx: client_tx,
-            rx: client_rx,
+            rx: client_tx,
+            tx: client_rx,
         })
     }
 }

@@ -15,7 +15,7 @@ use tokio::sync::{
 pub type RxMessage = Packet;
 pub type TxMessage = Packet;
 
-struct UdpRuntimeRx {
+pub struct UdpRuntimeRx {
     sender: broadcast::Sender<RxMessage>,
     udp_sender: Sender<TxMessage>,
     socket_recv: RecvHalf,
@@ -46,7 +46,7 @@ impl From<super::Error> for Error {
     }
 }
 
-struct UdpRuntimeTx {
+pub struct UdpRuntimeTx {
     gateway_id: [u8; 8],
     receiver: Receiver<TxMessage>,
     sender: Sender<TxMessage>,
@@ -60,7 +60,7 @@ pub struct UdpRuntime {
 }
 
 impl UdpRuntime {
-    fn split(self) -> (UdpRuntimeRx, UdpRuntimeTx, Sender<TxMessage>) {
+    pub fn split(self) -> (UdpRuntimeRx, UdpRuntimeTx, Sender<TxMessage>) {
         (self.rx, self.tx, self.poll_sender)
     }
 
