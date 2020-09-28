@@ -97,6 +97,10 @@ impl ClientTx {
             }
         }
     }
+
+    pub fn get_sender(&mut self) -> Sender<Request> {
+        self.sender.clone()
+    }
 }
 
 impl UdpRuntime {
