@@ -24,6 +24,7 @@ pub enum Event {
     NewClient((MacAddress, SocketAddr)),
     UpdateClient((MacAddress, SocketAddr)),
     UnableToParseUdpFrame(Vec<u8>),
+    NoClientWithMac(Box<pull_resp::Packet>, MacAddress)
 }
 
 // receives requests from clients
@@ -65,12 +66,39 @@ pub struct UdpRuntime {
 }
 use rand::Rng;
 
+#[derive(Debug)]
+pub enum SendError {
+    QueueFull(mpsc::error::SendError<(Packet, MacAddress)>),
+    AckChannelRecv(broadcast::RecvError),
+    AckError(super::packet::tx_ack::Error),
+    UnknownMac
+}
+
+impl From<mpsc::error::SendError<(Packet, MacAddress)>> for SendError {
+    fn from(e: mpsc::error::SendError<(Packet, MacAddress)>) -> Self {
+        SendError::QueueFull(e)
+    }
+}
+
+impl From<broadcast::RecvError> for SendError {
+    fn from(e: broadcast::RecvError) -> Self {
+        SendError::AckChannelRecv(e)
+    }
+}
+
+impl From<super::packet::tx_ack::Error> for SendError {
+    fn from(e: super::packet::tx_ack::Error) -> Self {
+        SendError::AckError(e)
+    }
+}
+
+
 impl ClientTx {
     pub async fn send(
         &mut self,
         txpk: TxPk,
         mac: MacAddress,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), SendError> {
         // assign random token
         let random_token = rand::thread_rng().gen();
 
@@ -84,16 +112,22 @@ impl ClientTx {
 
         // loop over responses until the TxAck is received
         loop {
-            if let Event::Packet(packet) = self.receiver.recv().await? {
-                if let Up::TxAck(ack) = packet {
-                    if ack.random_token == random_token {
-                        return if let Some(error) = ack.get_error() {
-                            Err(error.into())
-                        } else {
-                            Ok(())
-                        };
+            match self.receiver.recv().await? {
+                Event::Packet(packet) => {
+                        if let Up::TxAck(ack) = packet {
+                        if ack.random_token == random_token {
+                            return if let Some(error) = ack.get_error() {
+                                Err(error.into())
+                            } else {
+                                Ok(())
+                            };
+                        }
                     }
                 }
+                Event::NoClientWithMac(_packet, _mac) => {
+                    return Err(SendError::UnknownMac);
+                }
+                _ => (),
             }
         }
     }
@@ -112,7 +146,7 @@ impl UdpRuntime {
         &mut self,
         txpk: TxPk,
         mac: MacAddress,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), SendError> {
         self.tx.send(txpk, mac).await
     }
 
@@ -279,9 +313,9 @@ impl UdpTx {
                         } else {
                             if let Packet::Down(Down::PullResp(pull_resp)) = packet {
                                 self.client_tx_sender
-                                    .send(Event::Packet(Up::TxAck(
-                                        pull_resp.into_nack_for_client(mac),
-                                    )))
+                                    .send(
+                                        Event::NoClientWithMac(pull_resp, mac)
+                                    )
                                     .unwrap();
                             }
                         }
