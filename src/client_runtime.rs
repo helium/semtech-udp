@@ -179,13 +179,11 @@ impl UdpRuntimeTx {
                         up.set_gateway_mac(MacAddress::new(&self.gateway_id));
 
                         match up {
-                            Up::PushData(ref mut push_data) => {
-                                push_data.random_token = rand::random();
-                            }
-                            Up::PullData(_) => (),
-                            Up::TxAck(ref mut tx_ack) => {
-                                tx_ack.random_token = rand::random();
-                            }
+                            Up::PushData(ref mut push_data) =>
+                                push_data.random_token = rand::random(),
+                            Up::PullData(ref mut pull_data) =>
+                                pull_data.random_token = rand::random(),
+                            Up::TxAck(_) => (),
                         }
                     }
                     Packet::Down(_) => panic!("Should not be sending any down packets"),

@@ -107,6 +107,9 @@ impl ClientTx {
             random_token,
             data: pull_resp::Data::from_txpk(txpk),
         };
+
+        println!("Sending {:?}", packet);
+
         // send it to UdpTx channel
         self.sender.send((packet.into(), mac)).await?;
 
@@ -114,7 +117,7 @@ impl ClientTx {
         loop {
             match self.receiver.recv().await? {
                 Event::Packet(packet) => {
-                        if let Up::TxAck(ack) = packet {
+                    if let Up::TxAck(ack) = packet {
                         if ack.random_token == random_token {
                             return if let Some(error) = ack.get_error() {
                                 Err(error.into())

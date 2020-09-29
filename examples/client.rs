@@ -3,10 +3,11 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use structopt::StructOpt;
 use semtech_udp::Up::PushData;
+use tokio::time::{delay_for, Duration};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mac_address = [0, 0, 0, 0, 1, 2, 3, 4];
+    let mac_address = [0, 0, 0, 0, 4, 3, 2, 1];
     let cli = Opt::from_args();
     let outbound = SocketAddr::from(([0, 0, 0, 0], cli.port));
     let host = SocketAddr::from_str(cli.host.as_str())?;
@@ -19,9 +20,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         udp_runtime.run().await.unwrap();
     });
 
-    sender.send(
-        semtech_udp::Packet::Up(PushData(semtech_udp::push_data::Packet::random()))
-    ).await?;
+    let mut uplink_sender = sender.clone();
+    tokio::spawn(async move {
+        loop {
+            println!("Sending a random uplink");
+            uplink_sender.send(
+                semtech_udp::Packet::Up(PushData(semtech_udp::push_data::Packet::random()))
+            ).await.unwrap();
+            delay_for(Duration::from_secs(5)).await;
+        }
+    });
+
 
     loop {
         let msg = receiver.recv().await?;
@@ -30,9 +39,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match msg {
             semtech_udp::Packet::Down(down) => {
                 if let semtech_udp::Down::PullResp(packet) = down {
-                    println!("Wooh");
-                    sender.send((*packet).into_ack_for_gateway(
-                        semtech_udp::MacAddress::new(&mac_address)).into()).await?;
+                    let ack = (*packet).into_ack_for_gateway(
+                        semtech_udp::MacAddress::new(&mac_address));
+                    sender.send(ack.into()).await?;
                 }
             }
             semtech_udp::Packet::Up(_up) => {

@@ -14,6 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut udp_runtime = UdpRuntime::new(addr).await?;
     println!("Ready for clients");
     loop {
+        println!("Waiting for event");
         if let Ok(event) = udp_runtime.recv().await {
             match event {
                 Event::UnableToParseUdpFrame(buf) => {
@@ -62,6 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     {
                                         println!("Warning: error on send {:?}", e);
                                     }
+                                    println!("Send complete");
                                 }
                             }
                         }
