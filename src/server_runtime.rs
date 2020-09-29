@@ -313,14 +313,12 @@ impl UdpTx {
                         if let Some(addr) = self.clients.get(&mac) {
                             let n = packet.serialize(&mut buf)? as usize;
                             let _sent = self.socket_sender.send_to(&buf[..n], addr).await?;
-                        } else {
-                            if let Packet::Down(Down::PullResp(pull_resp)) = packet {
-                                self.client_tx_sender
-                                    .send(
-                                        Event::NoClientWithMac(pull_resp, mac)
-                                    )
-                                    .unwrap();
-                            }
+                        } else if let Packet::Down(Down::PullResp(pull_resp)) = packet {
+                            self.client_tx_sender
+                                .send(
+                                    Event::NoClientWithMac(pull_resp, mac)
+                                )
+                                .unwrap();
                         }
                     }
                     UdpMessage::PacketBySocket((packet, addr)) => {
