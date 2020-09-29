@@ -60,13 +60,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     // this async call returns when TxAck is received
                                     if let Err(e) = udp_runtime.send(txpk, packet.gateway_mac).await
                                     {
-                                        println!("Warning: error on send {}", e);
+                                        println!("Warning: error on send {:?}", e);
                                     }
                                 }
                             }
                         }
                         _ => println!("{:?}", packet),
                     }
+                }
+                Event::NoClientWithMac(_packet, mac) => {
+                    println!("Tried to send to client with unknown MAC: {:?}", mac)
                 }
             }
         }
