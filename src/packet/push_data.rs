@@ -39,43 +39,20 @@ impl Packet {
     }
 
     pub fn random() -> Packet {
-/*
-imme: false,
-tmst,
-freq: 902.800_000,
-rfch: 0,
-powe: 27,
-modu: "LORA".to_string(),
-datr: "SF8BW500".to_string(),
-codr: "4/5".to_string(),
-ipol: true,
-size,
-data,
-tmms: None,
-fdev: None,
-prea: None,
-ncrc: None,
-
- */
-
-        let rxpk = vec![
-            RxPk {
-                chan: 0,
-                codr: "4/5".to_string(),
-                data: "AA=".to_string(),
-                datr: "SF8BW500".to_string(),
-                freq:  902.800_000,
-                lsnr: -15.0,
-                modu: "Foo".to_string(),
-                rfch: 0,
-                rssi: -80,
-                size: 12,
-                stat: 12,
-                tmst: 12,
-
-            }
-
-        ];
+        let rxpk = vec![RxPk {
+            chan: 0,
+            codr: "4/5".to_string(),
+            data: "AA=".to_string(),
+            datr: "SF8BW500".to_string(),
+            freq: 902.800_000,
+            lsnr: -15.0,
+            modu: "Foo".to_string(),
+            rfch: 0,
+            rssi: -80,
+            size: 12,
+            stat: 12,
+            tmst: 12,
+        }];
 
         Packet {
             random_token: rand::random(),

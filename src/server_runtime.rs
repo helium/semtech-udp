@@ -24,7 +24,7 @@ pub enum Event {
     NewClient((MacAddress, SocketAddr)),
     UpdateClient((MacAddress, SocketAddr)),
     UnableToParseUdpFrame(Vec<u8>),
-    NoClientWithMac(Box<pull_resp::Packet>, MacAddress)
+    NoClientWithMac(Box<pull_resp::Packet>, MacAddress),
 }
 
 // receives requests from clients
@@ -71,7 +71,7 @@ pub enum SendError {
     QueueFull(mpsc::error::SendError<(Packet, MacAddress)>),
     AckChannelRecv(broadcast::RecvError),
     AckError(super::packet::tx_ack::Error),
-    UnknownMac
+    UnknownMac,
 }
 
 impl From<mpsc::error::SendError<(Packet, MacAddress)>> for SendError {
@@ -92,13 +92,8 @@ impl From<super::packet::tx_ack::Error> for SendError {
     }
 }
 
-
 impl ClientTx {
-    pub async fn send(
-        &mut self,
-        txpk: TxPk,
-        mac: MacAddress,
-    ) -> Result<(), SendError> {
+    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress) -> Result<(), SendError> {
         // assign random token
         let random_token = rand::thread_rng().gen();
 
@@ -145,11 +140,7 @@ impl UdpRuntime {
         (self.rx, self.tx)
     }
 
-    pub async fn send(
-        &mut self,
-        txpk: TxPk,
-        mac: MacAddress,
-    ) -> Result<(), SendError> {
+    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress) -> Result<(), SendError> {
         self.tx.send(txpk, mac).await
     }
 
@@ -315,9 +306,7 @@ impl UdpTx {
                             let _sent = self.socket_sender.send_to(&buf[..n], addr).await?;
                         } else if let Packet::Down(Down::PullResp(pull_resp)) = packet {
                             self.client_tx_sender
-                                .send(
-                                    Event::NoClientWithMac(pull_resp, mac)
-                                )
+                                .send(Event::NoClientWithMac(pull_resp, mac))
                                 .unwrap();
                         }
                     }

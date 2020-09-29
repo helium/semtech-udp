@@ -1,8 +1,8 @@
 use semtech_udp::client_runtime::UdpRuntime;
+use semtech_udp::Up::PushData;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use structopt::StructOpt;
-use semtech_udp::Up::PushData;
 use tokio::time::{delay_for, Duration};
 
 #[tokio::main]
@@ -24,13 +24,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
         loop {
             println!("Sending a random uplink");
-            uplink_sender.send(
-                semtech_udp::Packet::Up(PushData(semtech_udp::push_data::Packet::random()))
-            ).await.unwrap();
+            uplink_sender
+                .send(semtech_udp::Packet::Up(PushData(
+                    semtech_udp::push_data::Packet::random(),
+                )))
+                .await
+                .unwrap();
             delay_for(Duration::from_secs(5)).await;
         }
     });
-
 
     loop {
         let msg = receiver.recv().await?;
@@ -39,14 +41,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match msg {
             semtech_udp::Packet::Down(down) => {
                 if let semtech_udp::Down::PullResp(packet) = down {
-                    let ack = (*packet).into_ack_for_gateway(
-                        semtech_udp::MacAddress::new(&mac_address));
+                    let ack =
+                        (*packet).into_ack_for_gateway(semtech_udp::MacAddress::new(&mac_address));
                     sender.send(ack.into()).await?;
                 }
             }
-            semtech_udp::Packet::Up(_up) => {
-                panic!("Should not receive Semtech up frames")
-            }
+            semtech_udp::Packet::Up(_up) => panic!("Should not receive Semtech up frames"),
         }
     }
 }
