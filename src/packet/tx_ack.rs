@@ -96,7 +96,6 @@ pub enum Error {
     TX_FREQ,
     TX_POWER,
     GPS_UNLOCKED,
-    UNKNOWN_MAC, // this is an added error type in case a client tries
 }
 
 impl fmt::Display for Error {
@@ -110,10 +109,6 @@ impl fmt::Display for Error {
             Error::TX_FREQ => write!(f, "TxAck::Error::TX_FREQ, Transmit frequency is rejected"),
             Error::TX_POWER => write!(f, "TxAck::Error::TX_POWER"),
             Error::GPS_UNLOCKED => write!(f, "TxAck::Error::GPS_UNLOCKED"),
-            Error::UNKNOWN_MAC => write!(
-                f,
-                "TxAck::Error::UNKNOWN_MAC, Server does not have IP for MAC address requested"
-            ),
         }
     }
 }

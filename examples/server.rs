@@ -14,6 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut udp_runtime = UdpRuntime::new(addr).await?;
     println!("Ready for clients");
     loop {
+        println!("Waiting for event");
         if let Ok(event) = udp_runtime.recv().await {
             match event {
                 Event::UnableToParseUdpFrame(buf) => {
@@ -60,13 +61,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     // this async call returns when TxAck is received
                                     if let Err(e) = udp_runtime.send(txpk, packet.gateway_mac).await
                                     {
-                                        println!("Warning: error on send {}", e);
+                                        println!("Warning: error on send {:?}", e);
                                     }
+                                    println!("Send complete");
                                 }
                             }
                         }
                         _ => println!("{:?}", packet),
                     }
+                }
+                Event::NoClientWithMac(_packet, mac) => {
+                    println!("Tried to send to client with unknown MAC: {:?}", mac)
                 }
             }
         }

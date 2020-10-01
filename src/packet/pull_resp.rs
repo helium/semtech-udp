@@ -11,8 +11,8 @@ Bytes  | Function
 4-end  | JSON object, starting with {, ending with }, see section 6
  */
 use super::{
-    tx_ack, tx_ack::TxPkNack, write_preamble, Error as PktError, Identifier, MacAddress,
-    SerializablePacket, StringOrNum,
+    tx_ack, write_preamble, Error as PktError, Identifier, MacAddress, SerializablePacket,
+    StringOrNum,
 };
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Write};
@@ -32,14 +32,24 @@ impl Packet {
         }
     }
 
-    pub fn into_nack_for_client(self, gateway_mac: MacAddress) -> tx_ack::Packet {
+    pub fn into_nack_with_error_for_gateway(
+        self,
+        error: super::tx_ack::Error,
+        gateway_mac: MacAddress,
+    ) -> tx_ack::Packet {
         tx_ack::Packet {
             gateway_mac,
             random_token: self.random_token,
-            data: Some(TxPkNack::new(tx_ack::Error::UNKNOWN_MAC)),
+            data: Some(super::tx_ack::TxPkNack::new(error)),
         }
     }
 
+    // sets a default Gateway value
+    pub fn into_nack_with_error(self, e: super::tx_ack::Error) -> tx_ack::Packet {
+        self.into_nack_with_error_for_gateway(e, MacAddress { bytes: [0; 8] })
+    }
+
+    // sets a default Gateway value
     pub fn into_ack(self) -> tx_ack::Packet {
         self.into_ack_for_gateway(MacAddress { bytes: [0; 8] })
     }

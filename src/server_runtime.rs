@@ -24,18 +24,19 @@ pub enum Event {
     NewClient((MacAddress, SocketAddr)),
     UpdateClient((MacAddress, SocketAddr)),
     UnableToParseUdpFrame(Vec<u8>),
+    NoClientWithMac(Box<pull_resp::Packet>, MacAddress),
 }
 
 // receives requests from clients
 // dispatches them to UdpTx
-struct ClientRx {
+pub struct ClientTx {
     sender: Sender<Request>,
     receiver: broadcast::Receiver<Event>,
 }
 
 // sends packets to clients
 // broadcast enables many clients
-type ClientTx = broadcast::Receiver<Event>;
+pub type ClientRx = broadcast::Receiver<Event>;
 
 // translates message type such as to restrict
 // public message
@@ -60,17 +61,39 @@ struct UdpTx {
 }
 
 pub struct UdpRuntime {
-    tx: ClientTx,
     rx: ClientRx,
+    tx: ClientTx,
 }
 use rand::Rng;
 
-impl ClientRx {
-    pub async fn send(
-        &mut self,
-        txpk: TxPk,
-        mac: MacAddress,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+#[derive(Debug)]
+pub enum SendError {
+    QueueFull(mpsc::error::SendError<(Packet, MacAddress)>),
+    AckChannelRecv(broadcast::RecvError),
+    AckError(super::packet::tx_ack::Error),
+    UnknownMac,
+}
+
+impl From<mpsc::error::SendError<(Packet, MacAddress)>> for SendError {
+    fn from(e: mpsc::error::SendError<(Packet, MacAddress)>) -> Self {
+        SendError::QueueFull(e)
+    }
+}
+
+impl From<broadcast::RecvError> for SendError {
+    fn from(e: broadcast::RecvError) -> Self {
+        SendError::AckChannelRecv(e)
+    }
+}
+
+impl From<super::packet::tx_ack::Error> for SendError {
+    fn from(e: super::packet::tx_ack::Error) -> Self {
+        SendError::AckError(e)
+    }
+}
+
+impl ClientTx {
+    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress) -> Result<(), SendError> {
         // assign random token
         let random_token = rand::thread_rng().gen();
 
@@ -79,42 +102,50 @@ impl ClientRx {
             random_token,
             data: pull_resp::Data::from_txpk(txpk),
         };
+
+        println!("Sending {:?}", packet);
+
         // send it to UdpTx channel
         self.sender.send((packet.into(), mac)).await?;
 
         // loop over responses until the TxAck is received
         loop {
-            if let Event::Packet(packet) = self.receiver.recv().await? {
-                if let Up::TxAck(ack) = packet {
-                    if ack.random_token == random_token {
-                        return if let Some(error) = ack.get_error() {
-                            Err(error.into())
-                        } else {
-                            Ok(())
-                        };
+            match self.receiver.recv().await? {
+                Event::Packet(packet) => {
+                    if let Up::TxAck(ack) = packet {
+                        if ack.random_token == random_token {
+                            return if let Some(error) = ack.get_error() {
+                                Err(error.into())
+                            } else {
+                                Ok(())
+                            };
+                        }
                     }
                 }
+                Event::NoClientWithMac(_packet, _mac) => {
+                    return Err(SendError::UnknownMac);
+                }
+                _ => (),
             }
         }
+    }
+
+    pub fn get_sender(&mut self) -> Sender<Request> {
+        self.sender.clone()
     }
 }
 
 impl UdpRuntime {
-    #[allow(dead_code)]
-    fn split(self) -> (ClientTx, ClientRx) {
-        (self.tx, self.rx)
+    pub fn split(self) -> (ClientRx, ClientTx) {
+        (self.rx, self.tx)
     }
 
-    pub async fn send(
-        &mut self,
-        txpk: TxPk,
-        mac: MacAddress,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        self.rx.send(txpk, mac).await
+    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress) -> Result<(), SendError> {
+        self.tx.send(txpk, mac).await
     }
 
     pub async fn recv(&mut self) -> Result<Event, broadcast::RecvError> {
-        self.tx.recv().await
+        self.rx.recv().await
     }
 
     pub async fn new(addr: SocketAddr) -> Result<UdpRuntime, Box<dyn std::error::Error>> {
@@ -128,7 +159,7 @@ impl UdpRuntime {
         // receives requests from clients
         let (client_rx_sender, client_rx_receiver) = mpsc::channel(100);
 
-        let client_rx = ClientRx {
+        let client_rx = ClientTx {
             sender: client_rx_sender,
             receiver: client_tx_sender.subscribe(),
         };
@@ -177,8 +208,8 @@ impl UdpRuntime {
         });
 
         Ok(UdpRuntime {
-            tx: client_tx,
-            rx: client_rx,
+            rx: client_tx,
+            tx: client_rx,
         })
     }
 }
@@ -273,14 +304,10 @@ impl UdpTx {
                         if let Some(addr) = self.clients.get(&mac) {
                             let n = packet.serialize(&mut buf)? as usize;
                             let _sent = self.socket_sender.send_to(&buf[..n], addr).await?;
-                        } else {
-                            if let Packet::Down(Down::PullResp(pull_resp)) = packet {
-                                self.client_tx_sender
-                                    .send(Event::Packet(Up::TxAck(
-                                        pull_resp.into_nack_for_client(mac),
-                                    )))
-                                    .unwrap();
-                            }
+                        } else if let Packet::Down(Down::PullResp(pull_resp)) = packet {
+                            self.client_tx_sender
+                                .send(Event::NoClientWithMac(pull_resp, mac))
+                                .unwrap();
                         }
                     }
                     UdpMessage::PacketBySocket((packet, addr)) => {

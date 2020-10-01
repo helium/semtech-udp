@@ -37,6 +37,32 @@ impl Packet {
             },
         }
     }
+
+    pub fn random() -> Packet {
+        let rxpk = vec![RxPk {
+            chan: 0,
+            codr: "4/5".to_string(),
+            data: "AA=".to_string(),
+            datr: "SF8BW500".to_string(),
+            freq: 902.800_000,
+            lsnr: -15.0,
+            modu: "Foo".to_string(),
+            rfch: 0,
+            rssi: -80,
+            size: 12,
+            stat: 12,
+            tmst: 12,
+        }];
+
+        Packet {
+            random_token: rand::random(),
+            gateway_mac: MacAddress { bytes: [0; 8] },
+            data: Data {
+                rxpk: Some(rxpk),
+                stat: None,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
