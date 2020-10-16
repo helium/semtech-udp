@@ -161,6 +161,41 @@ impl ClientTx {
         }
     }
 
+    pub async fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> Result<(), Error> {
+        // assign random token
+        let random_token = rand::thread_rng().gen();
+
+        // create pull_resp frame with the data
+        let packet = pull_resp::Packet {
+            random_token,
+            data: pull_resp::Data::from_txpk(txpk),
+        };
+
+        // send it to UdpTx channel
+        self.sender.send((packet.into(), mac)).await?;
+
+        // loop over responses until the TxAck is received
+        loop {
+            match self.receiver.recv().await? {
+                Event::Packet(packet) => {
+                    if let Up::TxAck(ack) = packet {
+                        if ack.random_token == random_token {
+                            return if let Some(error) = ack.get_error() {
+                                Err(error.into())
+                            } else {
+                                Ok(())
+                            };
+                        }
+                    }
+                }
+                Event::NoClientWithMac(_packet, _mac) => {
+                    return Err(Error::UnknownMac);
+                }
+                _ => (),
+            }
+        }
+    }
+
     pub fn get_sender(&mut self) -> Sender<Request> {
         self.sender.clone()
     }
@@ -358,6 +393,74 @@ impl UdpTx {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let msg = match self {
+            Error::QueueFull(event) => {
+                format!("QueueFull. Droppping event: {}", event)
+            },
+            Error::AckChannelRecv(_) => {
+                "AckChannelRecv".to_string()
+            }
+            Error::AckError(error) => {
+                format!("AckError on trasmit {}", error)
+            }
+            Error::UnknownMac => {
+                "UnknownMac on on transmit".to_string()
+            }
+            Error::UdpError(error) => {
+                format!("UdpError: {}", error)
+
+            }
+            Error::ClientEventQueueFull(event) => {
+                format!("ClientEventQueueFull. Droppping event: {:?}", event)
+            }
+            Error::SocketEventQueueFull => {
+                "Internal UDP buffer full".to_string()
+            }
+            Error::SemtechUdpSerialization(err) => {
+                format!("SemtechUdpSerilaization Error: {:?}", err)
+
+            }
+        };
+        write!(f, "{}", msg)
+    }
+}
+
+use std::error::Error as StdError;
+
+impl StdError for Error {
+    fn description(&self) -> &str {
+        match self {
+            Error::QueueFull(_) => {
+                "QueueFull"
+            },
+            Error::AckChannelRecv(_) => {
+                "AckChannelRecv"
+            }
+            Error::AckError(_) => {
+                "AckError on trasmit"
+            }
+            Error::UnknownMac => {
+                "UnknownMac on on transmit"
+            }
+            Error::UdpError(_) => {
+                "UdpError"
+            }
+            Error::ClientEventQueueFull(_) => {
+                "ClientEventQueueFull. Droppping event"
+            }
+            Error::SocketEventQueueFull => {
+                "Internal UDP buffer full"
+            }
+            Error::SemtechUdpSerialization(_) => {
+                "SemtechUdpSerilaization Error"
             }
         }
     }
