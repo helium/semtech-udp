@@ -31,7 +31,8 @@ pub enum Event {
 // dispatches them to UdpTx
 pub struct ClientTx {
     sender: Sender<Request>,
-    receiver: broadcast::Receiver<Event>,
+    // you need to subscribe to the send channel
+    receiver_copier: broadcast::Sender<Event>,
 }
 
 // sends packets to clients
@@ -120,28 +121,26 @@ impl From<super::packet::tx_ack::Error> for Error {
     }
 }
 
-impl ClientTx {
-    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress) -> Result<(), Error> {
-        // assign random token
-        let random_token = rand::thread_rng().gen();
+pub struct PreparedSend {
+    random_token: u16,
+    mac: MacAddress,
+    packet: pull_resp::Packet,
+    sender: Sender<Request>,
+    receiver: broadcast::Receiver<Event>,
+}
 
-        // create pull_resp frame with the data
-        let packet = pull_resp::Packet {
-            random_token,
-            data: pull_resp::Data::from_txpk(txpk),
-        };
-
-        println!("Sending {:?}", packet);
-
+impl PreparedSend {
+    pub async fn dispatch(self) -> Result<(), Error> {
+        let (mut sender, mut receiver) = (self.sender, self.receiver);
         // send it to UdpTx channel
-        self.sender.send((packet.into(), mac)).await?;
+        sender.send((self.packet.into(), self.mac)).await?;
 
         // loop over responses until the TxAck is received
         loop {
-            match self.receiver.recv().await? {
+            match receiver.recv().await? {
                 Event::Packet(packet) => {
                     if let Up::TxAck(ack) = packet {
-                        if ack.random_token == random_token {
+                        if ack.random_token == self.random_token {
                             return if let Some(error) = ack.get_error() {
                                 Err(error.into())
                             } else {
@@ -157,8 +156,15 @@ impl ClientTx {
             }
         }
     }
+}
 
-    pub async fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> Result<(), Error> {
+impl ClientTx {
+    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress) -> Result<(), Error> {
+        let prepared_send = self.prepare_send(txpk, mac);
+        prepared_send.dispatch().await
+    }
+
+    pub fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> PreparedSend {
         // assign random token
         let random_token = rand::thread_rng().gen();
 
@@ -168,28 +174,12 @@ impl ClientTx {
             data: pull_resp::Data::from_txpk(txpk),
         };
 
-        // send it to UdpTx channel
-        self.sender.send((packet.into(), mac)).await?;
-
-        // loop over responses until the TxAck is received
-        loop {
-            match self.receiver.recv().await? {
-                Event::Packet(packet) => {
-                    if let Up::TxAck(ack) = packet {
-                        if ack.random_token == random_token {
-                            return if let Some(error) = ack.get_error() {
-                                Err(error.into())
-                            } else {
-                                Ok(())
-                            };
-                        }
-                    }
-                }
-                Event::NoClientWithMac(_packet, _mac) => {
-                    return Err(Error::UnknownMac);
-                }
-                _ => (),
-            }
+        PreparedSend {
+            random_token,
+            mac,
+            packet,
+            sender: self.get_sender(),
+            receiver: self.receiver_copier.subscribe(),
         }
     }
 
@@ -205,6 +195,10 @@ impl UdpRuntime {
 
     pub async fn send(&mut self, txpk: TxPk, mac: MacAddress) -> Result<(), Error> {
         self.tx.send(txpk, mac).await
+    }
+
+    pub fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> PreparedSend {
+        self.tx.prepare_send(txpk, mac)
     }
 
     pub async fn recv(&mut self) -> Result<Event, broadcast::RecvError> {
@@ -224,7 +218,7 @@ impl UdpRuntime {
 
         let client_rx = ClientTx {
             sender: client_rx_sender,
-            receiver: client_tx_sender.subscribe(),
+            receiver_copier: client_tx_sender.clone(),
         };
 
         let client_rx_translator = ClientRxTranslator {

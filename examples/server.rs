@@ -27,49 +27,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Event::UpdateClient((mac, addr)) => {
                     println!("Mac existed, but IP updated: {}, {}", mac, addr);
                 }
-                Event::Packet(packet) => {
-                    match packet {
-                        Packet::PushData(packet) => {
-                            if let Some(rxpk) = &packet.data.rxpk {
-                                println!("Received packets:");
-                                for received_packet in rxpk {
-                                    println!("\t{:?}", received_packet);
+                Event::Packet(packet) => match packet {
+                    Packet::PushData(packet) => {
+                        if let Some(rxpk) = &packet.data.rxpk {
+                            println!("Received packets:");
+                            for received_packet in rxpk {
+                                println!("\t{:?}", received_packet);
 
-                                    let buffer = [1, 2, 3, 4];
-                                    let size = buffer.len() as u64;
-                                    let data = base64::encode(buffer);
-                                    let tmst = StringOrNum::N(received_packet.tmst + 1_000_000);
+                                let buffer = [1, 2, 3, 4];
+                                let size = buffer.len() as u64;
+                                let data = base64::encode(buffer);
+                                let tmst = StringOrNum::N(received_packet.tmst + 1_000_000);
 
-                                    let txpk = pull_resp::TxPk {
-                                        imme: false,
-                                        tmst,
-                                        freq: 902.800_000,
-                                        rfch: 0,
-                                        powe: 27,
-                                        modu: "LORA".to_string(),
-                                        datr: "SF8BW500".to_string(),
-                                        codr: "4/5".to_string(),
-                                        ipol: true,
-                                        size,
-                                        data,
-                                        tmms: None,
-                                        fdev: None,
-                                        prea: None,
-                                        ncrc: None,
-                                    };
+                                let txpk = pull_resp::TxPk {
+                                    imme: false,
+                                    tmst,
+                                    freq: 902.800_000,
+                                    rfch: 0,
+                                    powe: 27,
+                                    modu: "LORA".to_string(),
+                                    datr: "SF8BW500".to_string(),
+                                    codr: "4/5".to_string(),
+                                    ipol: true,
+                                    size,
+                                    data,
+                                    tmms: None,
+                                    fdev: None,
+                                    prea: None,
+                                    ncrc: None,
+                                };
 
-                                    // this async call returns when TxAck is received
-                                    if let Err(e) = udp_runtime.send(txpk, packet.gateway_mac).await
-                                    {
-                                        println!("Warning: error on send {:?}", e);
+                                let prepared_send =
+                                    udp_runtime.prepare_send(txpk, packet.gateway_mac);
+
+                                tokio::spawn(async move {
+                                    if let Err(e) = prepared_send.dispatch().await {
+                                        panic!("Transmit Dispatch threw error: {:?}", e)
+                                    } else {
+                                        println!("Send complete");
                                     }
-                                    println!("Send complete");
-                                }
+                                });
                             }
                         }
-                        _ => println!("{:?}", packet),
                     }
-                }
+                    _ => println!("{:?}", packet),
+                },
                 Event::NoClientWithMac(_packet, mac) => {
                     println!("Tried to send to client with unknown MAC: {:?}", mac)
                 }
