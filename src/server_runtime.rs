@@ -75,7 +75,7 @@ pub enum Error {
     UdpError(std::io::Error),
     ClientEventQueueFull(broadcast::SendError<Event>),
     SocketEventQueueFull,
-    SemtechUdpSerialization(super::packet::Error)
+    SemtechUdpSerialization(super::packet::Error),
 }
 
 impl From<std::io::Error> for Error {
@@ -90,7 +90,6 @@ impl From<broadcast::SendError<Event>> for Error {
     }
 }
 
-
 impl From<mpsc::error::SendError<UdpMessage>> for Error {
     fn from(_err: mpsc::error::SendError<UdpMessage>) -> Error {
         Error::SocketEventQueueFull
@@ -102,8 +101,6 @@ impl From<super::packet::Error> for Error {
         Error::SemtechUdpSerialization(err)
     }
 }
-
-
 
 impl From<mpsc::error::SendError<(Packet, MacAddress)>> for Error {
     fn from(e: mpsc::error::SendError<(Packet, MacAddress)>) -> Self {
@@ -135,6 +132,41 @@ impl ClientTx {
         };
 
         println!("Sending {:?}", packet);
+
+        // send it to UdpTx channel
+        self.sender.send((packet.into(), mac)).await?;
+
+        // loop over responses until the TxAck is received
+        loop {
+            match self.receiver.recv().await? {
+                Event::Packet(packet) => {
+                    if let Up::TxAck(ack) = packet {
+                        if ack.random_token == random_token {
+                            return if let Some(error) = ack.get_error() {
+                                Err(error.into())
+                            } else {
+                                Ok(())
+                            };
+                        }
+                    }
+                }
+                Event::NoClientWithMac(_packet, _mac) => {
+                    return Err(Error::UnknownMac);
+                }
+                _ => (),
+            }
+        }
+    }
+
+    pub async fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> Result<(), Error> {
+        // assign random token
+        let random_token = rand::thread_rng().gen();
+
+        // create pull_resp frame with the data
+        let packet = pull_resp::Packet {
+            random_token,
+            data: pull_resp::Data::from_txpk(txpk),
+        };
 
         // send it to UdpTx channel
         self.sender.send((packet.into(), mac)).await?;
@@ -279,8 +311,7 @@ impl UdpRx {
                         match packet {
                             Packet::Up(packet) => {
                                 // echo all packets to client
-                                self.client_tx_sender
-                                    .send(Event::Packet(packet.clone()))?;
+                                self.client_tx_sender.send(Event::Packet(packet.clone()))?;
                                 match packet {
                                     Up::PullData(pull_data) => {
                                         let mac = pull_data.gateway_mac;
@@ -353,12 +384,48 @@ impl UdpTx {
                         // simply insert if no entry exists
                         else {
                             self.clients.insert(mac, addr);
-                            self.client_tx_sender
-                                .send(Event::NewClient((mac, addr)))?;
+                            self.client_tx_sender.send(Event::NewClient((mac, addr)))?;
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let msg = match self {
+            Error::QueueFull(event) => format!("QueueFull. Droppping event: {}", event),
+            Error::AckChannelRecv(_) => "AckChannelRecv".to_string(),
+            Error::AckError(error) => format!("AckError on trasmit {}", error),
+            Error::UnknownMac => "UnknownMac on on transmit".to_string(),
+            Error::UdpError(error) => format!("UdpError: {}", error),
+            Error::ClientEventQueueFull(event) => {
+                format!("ClientEventQueueFull. Droppping event: {:?}", event)
+            }
+            Error::SocketEventQueueFull => "Internal UDP buffer full".to_string(),
+            Error::SemtechUdpSerialization(err) => {
+                format!("SemtechUdpSerilaization Error: {:?}", err)
+            }
+        };
+        write!(f, "{}", msg)
+    }
+}
+
+use std::error::Error as StdError;
+
+impl StdError for Error {
+    fn description(&self) -> &str {
+        match self {
+            Error::QueueFull(_) => "QueueFull",
+            Error::AckChannelRecv(_) => "AckChannelRecv",
+            Error::AckError(_) => "AckError on trasmit",
+            Error::UnknownMac => "UnknownMac on on transmit",
+            Error::UdpError(_) => "UdpError",
+            Error::ClientEventQueueFull(_) => "ClientEventQueueFull. Droppping event",
+            Error::SocketEventQueueFull => "Internal UDP buffer full",
+            Error::SemtechUdpSerialization(_) => "SemtechUdpSerilaization Error",
         }
     }
 }
