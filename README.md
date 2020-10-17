@@ -1,3 +1,5 @@
+![Continuous Integration](https://github.com/helium/semtech-udp/workflows/Continuous%20Integration/badge.svg)
+
 # Semtech UDP
 
 Semtech UDP provides serialization and deserialization of packets complying
