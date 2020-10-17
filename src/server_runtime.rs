@@ -75,7 +75,7 @@ pub enum Error {
     UdpError(std::io::Error),
     ClientEventQueueFull(broadcast::SendError<Event>),
     SocketEventQueueFull,
-    SemtechUdpSerialization(super::packet::Error)
+    SemtechUdpSerialization(super::packet::Error),
 }
 
 impl From<std::io::Error> for Error {
@@ -90,7 +90,6 @@ impl From<broadcast::SendError<Event>> for Error {
     }
 }
 
-
 impl From<mpsc::error::SendError<UdpMessage>> for Error {
     fn from(_err: mpsc::error::SendError<UdpMessage>) -> Error {
         Error::SocketEventQueueFull
@@ -102,8 +101,6 @@ impl From<super::packet::Error> for Error {
         Error::SemtechUdpSerialization(err)
     }
 }
-
-
 
 impl From<mpsc::error::SendError<(Packet, MacAddress)>> for Error {
     fn from(e: mpsc::error::SendError<(Packet, MacAddress)>) -> Self {
@@ -314,8 +311,7 @@ impl UdpRx {
                         match packet {
                             Packet::Up(packet) => {
                                 // echo all packets to client
-                                self.client_tx_sender
-                                    .send(Event::Packet(packet.clone()))?;
+                                self.client_tx_sender.send(Event::Packet(packet.clone()))?;
                                 match packet {
                                     Up::PullData(pull_data) => {
                                         let mac = pull_data.gateway_mac;
@@ -388,8 +384,7 @@ impl UdpTx {
                         // simply insert if no entry exists
                         else {
                             self.clients.insert(mac, addr);
-                            self.client_tx_sender
-                                .send(Event::NewClient((mac, addr)))?;
+                            self.client_tx_sender.send(Event::NewClient((mac, addr)))?;
                         }
                     }
                 }
@@ -398,35 +393,20 @@ impl UdpTx {
     }
 }
 
-
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let msg = match self {
-            Error::QueueFull(event) => {
-                format!("QueueFull. Droppping event: {}", event)
-            },
-            Error::AckChannelRecv(_) => {
-                "AckChannelRecv".to_string()
-            }
-            Error::AckError(error) => {
-                format!("AckError on trasmit {}", error)
-            }
-            Error::UnknownMac => {
-                "UnknownMac on on transmit".to_string()
-            }
-            Error::UdpError(error) => {
-                format!("UdpError: {}", error)
-
-            }
+            Error::QueueFull(event) => format!("QueueFull. Droppping event: {}", event),
+            Error::AckChannelRecv(_) => "AckChannelRecv".to_string(),
+            Error::AckError(error) => format!("AckError on trasmit {}", error),
+            Error::UnknownMac => "UnknownMac on on transmit".to_string(),
+            Error::UdpError(error) => format!("UdpError: {}", error),
             Error::ClientEventQueueFull(event) => {
                 format!("ClientEventQueueFull. Droppping event: {:?}", event)
             }
-            Error::SocketEventQueueFull => {
-                "Internal UDP buffer full".to_string()
-            }
+            Error::SocketEventQueueFull => "Internal UDP buffer full".to_string(),
             Error::SemtechUdpSerialization(err) => {
                 format!("SemtechUdpSerilaization Error: {:?}", err)
-
             }
         };
         write!(f, "{}", msg)
@@ -438,30 +418,14 @@ use std::error::Error as StdError;
 impl StdError for Error {
     fn description(&self) -> &str {
         match self {
-            Error::QueueFull(_) => {
-                "QueueFull"
-            },
-            Error::AckChannelRecv(_) => {
-                "AckChannelRecv"
-            }
-            Error::AckError(_) => {
-                "AckError on trasmit"
-            }
-            Error::UnknownMac => {
-                "UnknownMac on on transmit"
-            }
-            Error::UdpError(_) => {
-                "UdpError"
-            }
-            Error::ClientEventQueueFull(_) => {
-                "ClientEventQueueFull. Droppping event"
-            }
-            Error::SocketEventQueueFull => {
-                "Internal UDP buffer full"
-            }
-            Error::SemtechUdpSerialization(_) => {
-                "SemtechUdpSerilaization Error"
-            }
+            Error::QueueFull(_) => "QueueFull",
+            Error::AckChannelRecv(_) => "AckChannelRecv",
+            Error::AckError(_) => "AckError on trasmit",
+            Error::UnknownMac => "UnknownMac on on transmit",
+            Error::UdpError(_) => "UdpError",
+            Error::ClientEventQueueFull(_) => "ClientEventQueueFull. Droppping event",
+            Error::SocketEventQueueFull => "Internal UDP buffer full",
+            Error::SemtechUdpSerialization(_) => "SemtechUdpSerilaization Error",
         }
     }
 }
