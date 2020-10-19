@@ -4,8 +4,7 @@
    receive downlink packets and send uplink packets easily
 */
 use super::{parser::Parser, pull_data, Down, MacAddress, Packet, SerializablePacket, Up};
-use std::net::SocketAddr;
-use tokio::net::udp::{RecvHalf, SendHalf};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::net::UdpSocket;
 use tokio::sync::{
     broadcast,
@@ -18,7 +17,7 @@ pub type TxMessage = Packet;
 pub struct UdpRuntimeRx {
     sender: broadcast::Sender<RxMessage>,
     udp_sender: Sender<TxMessage>,
-    socket_recv: RecvHalf,
+    socket_recv: Arc<UdpSocket>,
 }
 
 #[derive(Debug)]
@@ -50,7 +49,7 @@ pub struct UdpRuntimeTx {
     gateway_id: [u8; 8],
     receiver: Receiver<TxMessage>,
     sender: Sender<TxMessage>,
-    socket_send: SendHalf,
+    socket_send: Arc<UdpSocket>,
 }
 
 pub struct UdpRuntime {
@@ -73,7 +72,7 @@ impl UdpRuntime {
     }
 
     pub async fn run(self) -> Result<(), Error> {
-        let (rx, tx, mut poll_sender) = self.split();
+        let (rx, tx, poll_sender) = self.split();
 
         // udp_runtime_rx reads from the UDP port
         // and sends packets to the receiver channel
@@ -98,7 +97,7 @@ impl UdpRuntime {
                 if let Err(e) = poll_sender.send(packet.into()).await {
                     panic!("UdpRuntime error from sending PullData {}", e)
                 }
-                delay_for(Duration::from_millis(10000)).await;
+                sleep(Duration::from_millis(10000)).await;
             }
         });
 
@@ -113,10 +112,13 @@ impl UdpRuntime {
         let socket = UdpSocket::bind(&local).await?;
         // "connecting" filters for only frames from the server
         socket.connect(host).await?;
+
+        let socket_recv = Arc::new(socket);
+        let socket_send = socket_recv.clone();
+
         let (rx_sender, _) = broadcast::channel(100);
         let (tx_sender, tx_receiver) = mpsc::channel(100);
 
-        let (socket_recv, socket_send) = socket.split();
         Ok(UdpRuntime {
             rx: UdpRuntimeRx {
                 sender: rx_sender,
@@ -135,10 +137,10 @@ impl UdpRuntime {
 }
 
 use std::time::Duration;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 impl UdpRuntimeRx {
-    pub async fn run(mut self) -> Result<(), Error> {
+    pub async fn run(self) -> Result<(), Error> {
         let mut buf = vec![0u8; 1024];
         loop {
             match self.socket_recv.recv(&mut buf).await {
