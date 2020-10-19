@@ -207,7 +207,7 @@ impl UdpRuntime {
     pub async fn new(addr: SocketAddr) -> Result<UdpRuntime, Error> {
         let socket = UdpSocket::bind(&addr).await?;
         let socket_receiver = Arc::new(socket);
-        let socket_sender= socket_receiver.clone();
+        let socket_sender = socket_receiver.clone();
 
         let (udp_tx_sender, udp_tx_receiver) = mpsc::channel(100);
 

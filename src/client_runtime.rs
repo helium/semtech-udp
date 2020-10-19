@@ -114,8 +114,7 @@ impl UdpRuntime {
         socket.connect(host).await?;
 
         let socket_recv = Arc::new(socket);
-        let socket_send= socket_recv.clone();
-
+        let socket_send = socket_recv.clone();
 
         let (rx_sender, _) = broadcast::channel(100);
         let (tx_sender, tx_receiver) = mpsc::channel(100);
