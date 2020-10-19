@@ -28,6 +28,7 @@ pub enum Event {
 
 // receives requests from clients
 // dispatches them to UdpTx
+#[derive(Debug)]
 pub struct ClientTx {
     sender: Sender<Request>,
     // you need to subscribe to the send channel
@@ -60,6 +61,7 @@ struct UdpTx {
     socket_sender: Arc<UdpSocket>,
 }
 
+#[derive(Debug)]
 pub struct UdpRuntime {
     rx: ClientRx,
     tx: ClientTx,
