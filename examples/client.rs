@@ -2,8 +2,8 @@ use semtech_udp::client_runtime::UdpRuntime;
 use semtech_udp::Up::PushData;
 use std::net::SocketAddr;
 use std::str::FromStr;
-use structopt::StructOpt;
 use std::time::Duration;
+use structopt::StructOpt;
 use tokio::time::sleep;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
