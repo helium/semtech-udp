@@ -39,7 +39,7 @@ impl Packet {
     }
 
     pub fn random() -> Packet {
-        let rxpk = vec![RxPk {
+        let rxpk = vec![RxPk::V1(RxPkV1 {
             chan: 0,
             codr: "4/5".to_string(),
             data: "AA=".to_string(),
@@ -52,7 +52,7 @@ impl Packet {
             size: 12,
             stat: 12,
             tmst: 12,
-        }];
+        })];
 
         Packet {
             random_token: rand::random(),
