@@ -18,8 +18,6 @@ enum UdpMessage {
     Client((MacAddress, SocketAddr)),
 }
 
-type Request = (Packet, MacAddress);
-
 #[derive(Debug, Clone)]
 pub enum Event {
     Packet(Up),
@@ -33,7 +31,7 @@ pub enum Event {
 // dispatches them to UdpTx
 #[derive(Debug)]
 pub struct ClientTx {
-    sender: Sender<Request>,
+    sender: Sender<UdpMessage>,
     // you need to subscribe to the send channel
     receiver_copier: broadcast::Sender<Event>,
 }
@@ -41,13 +39,6 @@ pub struct ClientTx {
 // sends packets to clients
 // broadcast enables many clients
 pub type ClientRx = broadcast::Receiver<Event>;
-
-// translates message type such as to restrict
-// public message
-struct ClientRxTranslator {
-    receiver: Receiver<Request>,
-    udp_tx_sender: Sender<UdpMessage>,
-}
 
 // receives UDP packets
 struct UdpRx {
@@ -136,7 +127,7 @@ pub struct PreparedSend {
     random_token: u16,
     mac: MacAddress,
     packet: pull_resp::Packet,
-    sender: Sender<Request>,
+    sender: Sender<UdpMessage>,
     receiver: broadcast::Receiver<Event>,
 }
 
@@ -144,7 +135,9 @@ impl PreparedSend {
     async fn just_dispatch(self) -> Result<(), Error> {
         let (sender, mut receiver) = (self.sender, self.receiver);
         // send it to UdpTx channel
-        sender.send((self.packet.into(), self.mac)).await?;
+        sender
+            .send(UdpMessage::PacketByMac((self.packet.into(), self.mac)))
+            .await?;
 
         // loop over responses until the TxAck is received
         loop {
@@ -207,7 +200,7 @@ impl ClientTx {
         }
     }
 
-    pub fn get_sender(&mut self) -> Sender<Request> {
+    fn get_sender(&mut self) -> Sender<UdpMessage> {
         self.sender.clone()
     }
 }
@@ -243,17 +236,10 @@ impl UdpRuntime {
 
         // broadcasts to client
         let (client_tx_sender, client_tx_receiver) = broadcast::channel(100);
-        // receives requests from clients
-        let (client_rx_sender, client_rx_receiver) = mpsc::channel(100);
 
         let client_rx = ClientTx {
-            sender: client_rx_sender,
+            sender: udp_tx_sender.clone(),
             receiver_copier: client_tx_sender.clone(),
-        };
-
-        let client_rx_translator = ClientRxTranslator {
-            receiver: client_rx_receiver,
-            udp_tx_sender: udp_tx_sender.clone(),
         };
 
         let client_tx = client_tx_receiver;
@@ -287,32 +273,25 @@ impl UdpRuntime {
             }
         });
 
-        // translates client requests into UdpTxMessage of private type
-        tokio::spawn(async move {
-            if let Err(e) = client_rx_translator.run().await {
-                panic!("UdpRx threw error: {:?}", e)
-            }
-        });
-
         Ok(UdpRuntime {
             rx: client_tx,
             tx: client_rx,
         })
     }
 }
-
-impl ClientRxTranslator {
-    pub async fn run(mut self) -> Result<(), Error> {
-        loop {
-            let msg = self.receiver.recv().await;
-            if let Some((packet, mac)) = msg {
-                self.udp_tx_sender
-                    .send(UdpMessage::PacketByMac((packet, mac)))
-                    .await?;
-            }
-        }
-    }
-}
+//
+// impl ClientRxTranslator {
+//     pub async fn run(mut self) -> Result<(), Error> {
+//         loop {
+//             let msg = self.receiver.recv().await;
+//             if let Some((packet, mac)) = msg {
+//                 self.udp_tx_sender
+//                     .send(UdpMessage::PacketByMac((packet, mac)))
+//                     .await?;
+//             }
+//         }
+//     }
+// }
 
 impl UdpRx {
     pub async fn run(self) -> Result<(), Error> {
