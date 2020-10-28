@@ -99,10 +99,10 @@ pub struct RxPkV1 {
     pub data: String,
     pub datr: String,
     pub freq: f64,
-    pub lsnr: f64,
+    pub lsnr: f32,
     pub modu: String,
     pub rfch: u64,
-    pub rssi: i64,
+    pub rssi: i32,
     pub size: u64,
     pub stat: u64,
     pub tmst: u64,
@@ -137,7 +137,7 @@ pub struct RxPkV2 {
     pub brd: usize,
     pub aesk: usize,
     pub delayed: bool,
-    pub rsig: RSig,
+    pub rsig: Vec<RSig>,
     pub codr: String,
     pub data: String,
     pub datr: String,
@@ -146,11 +146,13 @@ pub struct RxPkV2 {
     pub rfch: u64,
     pub size: u64,
     pub stat: u64,
-    pub tmst: u64,
+    pub tmst: Option<u64>,
+    pub tmms: Option<u64>,
 }
 
 /*
-   Name |  Type  | Function
+   Name |  Ty
+   pe  | Function
 :------:|:------:|--------------------------------------------------------------
 ant     | number | Antenna number on which signal has been received
 chan    | number | (unsigned integer) Concentrator "IF" channel used for RX
@@ -168,23 +170,46 @@ ftdelta | number | Number of nanoseconds between the 'main' fts and the 'alterna
 pub struct RSig {
     pub ant: usize,
     pub chan: u64,
-    pub rssic: bool,
-    pub rsig: RSig,
-    pub codr: String,
-    pub data: String,
-    pub datr: String,
-    pub freq: f64,
-    pub modu: String,
-    pub rfch: u64,
-    pub size: u64,
-    pub stat: u64,
-    pub tmst: u64,
+    pub rssic: i32,
+    pub rssis: i32,
+    pub lsnr: f32,
+    pub etime: String,
+    pub foff: i64,
+    pub ftstat: u8,
+    pub ftver: usize,
+    pub ftdelta: isize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-enum RxPk {
+pub enum RxPk {
     V1(RxPkV1),
     V2(RxPkV2),
+}
+
+impl RxPk {
+    pub fn get_snr(&self) -> f32 {
+        match self {
+            RxPk::V1(pk) => {
+                pk.lsnr
+            }
+            RxPk::V2(pk) => {
+                pk.rsig[0].lsnr
+            }
+        }
+    }
+
+    pub fn get_rssi(&self) -> i32 {
+        match self {
+            RxPk::V1(pk) => {
+                pk.rssi
+            }
+            RxPk::V2(pk) => {
+                // erlang implementation spec packet_rssi(map()) -> number()
+                // takes rssic so we will too
+                pk.rsig[0].rssic
+            }
+        }
+    }
 }
 
 /*
