@@ -93,7 +93,7 @@ size | number | RF packet payload size in bytes (unsigned integer)
 data | string | Base64 encoded RF packet payload, padded
  */
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RxPk {
+pub struct RxPkV1 {
     pub chan: u64,
     pub codr: String,
     pub data: String,
@@ -106,6 +106,85 @@ pub struct RxPk {
     pub size: u64,
     pub stat: u64,
     pub tmst: u64,
+}
+
+/*
+Name   |  Type  | Function
+:--------:|:------:|--------------------------------------------------------------
+jver    | string | Version of the JSON rxpk frame format (always 2)
+brd     | number | (unsigned integer) Radio ID (default 0)
+aesk    | number | concentrator used for RX
+delayed | bool   | true if the messsage has been delayed due to buffering
+rsig    | object | array of object Received signal information, per antenna
+time    | string | UTC time of pkt RX, us precision, ISO 8601 'compact' format
+tmms    | number | GPS time of pkt RX, number of milliseconds since 06.Jan.1980
+tmst    | number | Internal timestamp of "RX finished" event (32b unsigned)
+freq    | number | RX central frequency in MHz (unsigned float, Hz precision)
+chan    | number | Concentrator "IF" channel used for RX (unsigned integer)
+rfch    | number | Concentrator "RF chain" used for RX (unsigned integer)
+stat    | number | CRC status: 1 = OK, -1 = fail, 0 = no CRC
+modu    | string | Modulation identifier "LORA" or "FSK"
+datr    | string | LoRa datarate identifier (eg. SF12BW500)
+datr    | number | FSK datarate (unsigned, in bits per second)
+codr    | string | LoRa ECC coding rate identifier
+size    | number | RF packet payload size in bytes (unsigned integer)
+data    | string | Base64 encoded RF packet payload, padded
+ */
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RxPkV2 {
+    pub jver: String,
+    pub brd: usize,
+    pub aesk: usize,
+    pub delayed: bool,
+    pub rsig: RSig,
+    pub codr: String,
+    pub data: String,
+    pub datr: String,
+    pub freq: f64,
+    pub modu: String,
+    pub rfch: u64,
+    pub size: u64,
+    pub stat: u64,
+    pub tmst: u64,
+}
+
+/*
+   Name |  Type  | Function
+:------:|:------:|--------------------------------------------------------------
+ant     | number | Antenna number on which signal has been received
+chan    | number | (unsigned integer) Concentrator "IF" channel used for RX
+rssic   | number | (signed integer) RSSI in dBm of the channel (1 dB precision)
+rssis   | number | (signed integer) RSSI in dBm of the signal (1 dB precision)
+rssisd  | number | (unsigned integer) Standard deviation of RSSI during preamble
+lsnr    | number | (signed float) Lora SNR ratio in dB (0.1 dB precision)
+etime   | string | Encrypted 'main' fine timestamp, ns precision [0..999999999]
+foff    | number | Frequency offset in Hz [-125 kHz..+125 khz]
+ftstat  | number | (8 bits unsigned integer) Fine timestamp status
+ftver   | number | Version of the 'main' fine timestamp
+ftdelta | number | Number of nanoseconds between the 'main' fts and the 'alternative' one
+ */
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RSig {
+    pub ant: usize,
+    pub chan: u64,
+    pub rssic: bool,
+    pub rsig: RSig,
+    pub codr: String,
+    pub data: String,
+    pub datr: String,
+    pub freq: f64,
+    pub modu: String,
+    pub rfch: u64,
+    pub size: u64,
+    pub stat: u64,
+    pub tmst: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+enum RxPk {
+    V1(RxPkV1),
+    V2(RxPkV2),
 }
 
 /*
