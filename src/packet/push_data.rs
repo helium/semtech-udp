@@ -190,32 +190,22 @@ macro_rules! get_v1v2 {
     // `()` indictes that the macro takes no argument.
     ($self:expr, $field:ident) => {
         match $self {
-            RxPk::V1(pk) => {
-                &pk.$field
-            }
-            RxPk::V2(pk) => {
-                &pk.$field
-            }
+            RxPk::V1(pk) => &pk.$field,
+            RxPk::V2(pk) => &pk.$field,
         }
     };
 }
 impl RxPk {
     pub fn get_snr(&self) -> f32 {
         match self {
-            RxPk::V1(pk) => {
-                pk.lsnr
-            }
-            RxPk::V2(pk) => {
-                pk.rsig[0].lsnr
-            }
+            RxPk::V1(pk) => pk.lsnr,
+            RxPk::V2(pk) => pk.rsig[0].lsnr,
         }
     }
 
     pub fn get_rssi(&self) -> i32 {
         match self {
-            RxPk::V1(pk) => {
-                pk.rssi
-            }
+            RxPk::V1(pk) => pk.rssi,
             RxPk::V2(pk) => {
                 // erlang implementation spec packet_rssi(map()) -> number()
                 // takes rssic so we will too

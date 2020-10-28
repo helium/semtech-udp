@@ -97,7 +97,7 @@ pub enum Error {
     TX_POWER,
     GPS_UNLOCKED,
     SEND_LBT,
-    SEND_FAIL
+    SEND_FAIL,
 }
 
 impl fmt::Display for Error {
