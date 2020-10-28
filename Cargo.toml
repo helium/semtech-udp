@@ -33,7 +33,11 @@ structopt = { version = "0.3.2", default-features = false }
 [dependencies.tokio]
 optional = true
 version = "0.3.0"
-features = ["full"]
+features = ["rt", "net", "sync", "time"]
+
+[dev-dependencies.tokio]
+version = "0.3.0"
+features = ["rt", "net", "sync", "time", "macros", "rt-multi-thread"]
 
 [features]
 default = []

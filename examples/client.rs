@@ -2,9 +2,9 @@ use semtech_udp::client_runtime::UdpRuntime;
 use semtech_udp::Up::PushData;
 use std::net::SocketAddr;
 use std::str::FromStr;
+use std::time::Duration;
 use structopt::StructOpt;
-use tokio::time::{delay_for, Duration};
-
+use tokio::time::sleep;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mac_address = [0, 0, 0, 0, 4, 3, 2, 1];
@@ -14,13 +14,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Connecting to server {} from port {}", cli.host, cli.port);
     let udp_runtime = UdpRuntime::new(mac_address.clone(), outbound, host).await?;
 
-    let (mut receiver, mut sender) = (udp_runtime.subscribe(), udp_runtime.publish_to());
+    let (mut receiver, sender) = (udp_runtime.subscribe(), udp_runtime.publish_to());
 
     tokio::spawn(async move {
         udp_runtime.run().await.unwrap();
     });
 
-    let mut uplink_sender = sender.clone();
+    let uplink_sender = sender.clone();
     tokio::spawn(async move {
         loop {
             println!("Sending a random uplink");
@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )))
                 .await
                 .unwrap();
-            delay_for(Duration::from_secs(5)).await;
+            sleep(Duration::from_secs(5)).await;
         }
     });
 
