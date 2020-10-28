@@ -96,6 +96,8 @@ pub enum Error {
     TX_FREQ,
     TX_POWER,
     GPS_UNLOCKED,
+    SEND_LBT,
+    SEND_FAIL
 }
 
 impl fmt::Display for Error {
@@ -109,6 +111,8 @@ impl fmt::Display for Error {
             Error::TX_FREQ => write!(f, "TxAck::Error::TX_FREQ, Transmit frequency is rejected"),
             Error::TX_POWER => write!(f, "TxAck::Error::TX_POWER"),
             Error::GPS_UNLOCKED => write!(f, "TxAck::Error::GPS_UNLOCKED"),
+            Error::SEND_LBT => write!(f, "TxAck::Error::SEND_LBT"),
+            Error::SEND_FAIL => write!(f, "TxAck::Error::SEND_FAIL"),
         }
     }
 }
