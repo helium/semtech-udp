@@ -4,6 +4,7 @@ use semtech_udp::{
     StringOrNum, Up as Packet,
 };
 use std::net::SocketAddr;
+use std::time::Duration;
 use structopt::StructOpt;
 
 #[tokio::main]
@@ -61,7 +62,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     udp_runtime.prepare_send(txpk, packet.gateway_mac);
 
                                 tokio::spawn(async move {
-                                    if let Err(e) = prepared_send.dispatch().await {
+                                    if let Err(e) =
+                                        prepared_send.dispatch(Some(Duration::from_secs(5))).await
+                                    {
                                         panic!("Transmit Dispatch threw error: {:?}", e)
                                     } else {
                                         println!("Send complete");

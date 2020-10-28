@@ -226,6 +226,10 @@ impl UdpRuntime {
         self.tx.send(txpk, mac, timeout).await
     }
 
+    pub fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> PreparedSend {
+        self.tx.prepare_send(txpk, mac)
+    }
+
     pub async fn recv(&mut self) -> Result<Event, broadcast::error::RecvError> {
         self.rx.recv().await
     }
