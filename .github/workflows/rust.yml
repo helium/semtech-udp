@@ -34,7 +34,9 @@ jobs:
           args: -- -Dclippy::all
 
       - name: Build
-        run: cargo build --workspace --all-features
+        run:
+          cargo build --workspace --all-features
+          cargo build --examples --all-features
 
   build-mac:
     runs-on: macos-latest
@@ -54,7 +56,9 @@ jobs:
           access_token: ${{ github.token }}
 
       - name: Build
-        run: cargo build --workspace --all-features
+        run:
+          cargo build --workspace --all-features
+          cargo build --examples --all-features
 
 
   build-windows:
@@ -75,4 +79,6 @@ jobs:
           access_token: ${{ github.token }}
 
       - name: Build
-        run: cargo build --workspace --all-features
+        run:
+          cargo build --workspace --all-features
+          cargo build --examples --all-features
