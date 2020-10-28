@@ -1,11 +1,14 @@
 use super::{
     parser::Parser, pull_resp, pull_resp::TxPk, Down, MacAddress, Packet, SerializablePacket, Up,
 };
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use tokio::net::UdpSocket;
-use tokio::sync::{
-    broadcast,
-    mpsc::{self, Receiver, Sender},
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use tokio::{
+    net::UdpSocket,
+    sync::{
+        broadcast,
+        mpsc::{self, Receiver, Sender},
+    },
+    time::timeout,
 };
 
 #[derive(Debug)]
@@ -73,11 +76,18 @@ pub enum Error {
     QueueFull(mpsc::error::SendError<(Packet, MacAddress)>),
     AckChannelRecv(broadcast::error::RecvError),
     AckError(super::packet::tx_ack::Error),
+    SendTimeout,
     UnknownMac,
     UdpError(std::io::Error),
     ClientEventQueueFull(broadcast::error::SendError<Event>),
     SocketEventQueueFull,
     SemtechUdpSerialization(super::packet::Error),
+}
+
+impl From<tokio::time::error::Elapsed> for Error {
+    fn from(_err: tokio::time::error::Elapsed) -> Error {
+        Error::SendTimeout
+    }
 }
 
 impl From<std::io::Error> for Error {
@@ -131,7 +141,7 @@ pub struct PreparedSend {
 }
 
 impl PreparedSend {
-    pub async fn dispatch(self) -> Result<(), Error> {
+    async fn just_dispatch(self) -> Result<(), Error> {
         let (sender, mut receiver) = (self.sender, self.receiver);
         // send it to UdpTx channel
         sender.send((self.packet.into(), self.mac)).await?;
@@ -157,12 +167,25 @@ impl PreparedSend {
             }
         }
     }
+
+    pub async fn dispatch(self, timeout_duration: Option<Duration>) -> Result<(), Error> {
+        if let Some(duration) = timeout_duration {
+            timeout(duration, self.just_dispatch()).await?
+        } else {
+            self.just_dispatch().await
+        }
+    }
 }
 
 impl ClientTx {
-    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress) -> Result<(), Error> {
+    pub async fn send(
+        &mut self,
+        txpk: TxPk,
+        mac: MacAddress,
+        timeout: Option<Duration>,
+    ) -> Result<(), Error> {
         let prepared_send = self.prepare_send(txpk, mac);
-        prepared_send.dispatch().await
+        prepared_send.dispatch(timeout).await
     }
 
     pub fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> PreparedSend {
@@ -194,12 +217,13 @@ impl UdpRuntime {
         (self.rx, self.tx)
     }
 
-    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress) -> Result<(), Error> {
-        self.tx.send(txpk, mac).await
-    }
-
-    pub fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> PreparedSend {
-        self.tx.prepare_send(txpk, mac)
+    pub async fn send(
+        &mut self,
+        txpk: TxPk,
+        mac: MacAddress,
+        timeout: Option<Duration>,
+    ) -> Result<(), Error> {
+        self.tx.send(txpk, mac, timeout).await
     }
 
     pub async fn recv(&mut self) -> Result<Event, broadcast::error::RecvError> {
@@ -404,6 +428,7 @@ impl std::fmt::Display for Error {
             Error::SemtechUdpSerialization(err) => {
                 format!("SemtechUdpSerilaization Error: {:?}", err)
             }
+            Error::SendTimeout => format!("Sending RF Packet Timed Out"),
         };
         write!(f, "{}", msg)
     }
@@ -422,6 +447,7 @@ impl StdError for Error {
             Error::ClientEventQueueFull(_) => "ClientEventQueueFull. Droppping event",
             Error::SocketEventQueueFull => "Internal UDP buffer full",
             Error::SemtechUdpSerialization(_) => "SemtechUdpSerilaization Error",
+            Error::SendTimeout => "Sending RF Packet Timed Out",
         }
     }
 }
