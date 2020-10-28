@@ -146,7 +146,7 @@ pub struct RxPkV2 {
     pub rfch: u64,
     pub size: u64,
     pub stat: u64,
-    pub tmst: Option<u64>,
+    pub tmst: u64,
     pub tmms: Option<u64>,
 }
 
@@ -186,6 +186,19 @@ pub enum RxPk {
     V2(RxPkV2),
 }
 
+macro_rules! get_v1v2 {
+    // `()` indictes that the macro takes no argument.
+    ($self:expr, $field:ident) => {
+        match $self {
+            RxPk::V1(pk) => {
+                &pk.$field
+            }
+            RxPk::V2(pk) => {
+                &pk.$field
+            }
+        }
+    };
+}
 impl RxPk {
     pub fn get_snr(&self) -> f32 {
         match self {
@@ -209,6 +222,18 @@ impl RxPk {
                 pk.rsig[0].rssic
             }
         }
+    }
+
+    pub fn get_frequency(&self) -> &f64 {
+        get_v1v2!(self, freq)
+    }
+
+    pub fn get_data(&self) -> String {
+        get_v1v2!(self, data).clone()
+    }
+
+    pub fn get_tmst(&self) -> &u64 {
+        get_v1v2!(self, tmst)
     }
 }
 
