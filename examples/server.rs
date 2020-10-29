@@ -30,6 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Event::Packet(packet) => match packet {
                     Packet::PushData(packet) => {
+                        println!("Push data {:?}", packet);
                         if let Some(rxpk) = &packet.data.rxpk {
                             println!("Received packets:");
                             for received_packet in rxpk {
@@ -38,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let buffer = [1, 2, 3, 4];
                                 let size = buffer.len() as u64;
                                 let data = base64::encode(buffer);
-                                let tmst = StringOrNum::N(received_packet.tmst + 1_000_000);
+                                let tmst = StringOrNum::N(received_packet.get_tmst() + 1_000_000);
 
                                 let txpk = pull_resp::TxPk {
                                     imme: false,

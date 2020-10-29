@@ -33,10 +33,15 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: -- -Dclippy::all
 
+      - name: Unit tests
+        run: cargo test --features server,client
+
       - name: Build
         run: |
           cargo build --workspace --all-features
           cargo build --examples --all-features
+
+
 
   build-mac:
     runs-on: macos-latest

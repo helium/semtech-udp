@@ -39,7 +39,7 @@ impl Packet {
     }
 
     pub fn random() -> Packet {
-        let rxpk = vec![RxPk {
+        let rxpk = vec![RxPk::V1(RxPkV1 {
             chan: 0,
             codr: "4/5".to_string(),
             data: "AA=".to_string(),
@@ -52,7 +52,7 @@ impl Packet {
             size: 12,
             stat: 12,
             tmst: 12,
-        }];
+        })];
 
         Packet {
             random_token: rand::random(),
@@ -93,19 +93,138 @@ size | number | RF packet payload size in bytes (unsigned integer)
 data | string | Base64 encoded RF packet payload, padded
  */
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RxPk {
+pub struct RxPkV1 {
     pub chan: u64,
     pub codr: String,
     pub data: String,
     pub datr: String,
     pub freq: f64,
-    pub lsnr: f64,
+    pub lsnr: f32,
     pub modu: String,
     pub rfch: u64,
-    pub rssi: i64,
+    pub rssi: i32,
     pub size: u64,
     pub stat: u64,
     pub tmst: u64,
+}
+
+/*
+Name   |  Type  | Function
+:--------:|:------:|--------------------------------------------------------------
+jver    | string | Version of the JSON rxpk frame format (always 2)
+brd     | number | (unsigned integer) Radio ID (default 0)
+aesk    | number | concentrator used for RX
+delayed | bool   | true if the messsage has been delayed due to buffering
+rsig    | object | array of object Received signal information, per antenna
+time    | string | UTC time of pkt RX, us precision, ISO 8601 'compact' format
+tmms    | number | GPS time of pkt RX, number of milliseconds since 06.Jan.1980
+tmst    | number | Internal timestamp of "RX finished" event (32b unsigned)
+freq    | number | RX central frequency in MHz (unsigned float, Hz precision)
+chan    | number | Concentrator "IF" channel used for RX (unsigned integer)
+rfch    | number | Concentrator "RF chain" used for RX (unsigned integer)
+stat    | number | CRC status: 1 = OK, -1 = fail, 0 = no CRC
+modu    | string | Modulation identifier "LORA" or "FSK"
+datr    | string | LoRa datarate identifier (eg. SF12BW500)
+datr    | number | FSK datarate (unsigned, in bits per second)
+codr    | string | LoRa ECC coding rate identifier
+size    | number | RF packet payload size in bytes (unsigned integer)
+data    | string | Base64 encoded RF packet payload, padded
+ */
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RxPkV2 {
+    pub aesk: usize,
+    pub brd: usize,
+    pub codr: String,
+    pub data: String,
+    pub datr: String,
+    pub freq: f64,
+    pub jver: usize,
+    pub modu: String,
+    pub rsig: Vec<RSig>,
+    pub size: u64,
+    pub stat: u64,
+    pub tmst: u64,
+    pub delayed: Option<bool>,
+    pub tmms: Option<u64>,
+    pub time: Option<String>,
+}
+
+/*
+   Name |  Ty
+   pe  | Function
+:------:|:------:|--------------------------------------------------------------
+ant     | number | Antenna number on which signal has been received
+chan    | number | (unsigned integer) Concentrator "IF" channel used for RX
+rssic   | number | (signed integer) RSSI in dBm of the channel (1 dB precision)
+rssis   | number | (signed integer) RSSI in dBm of the signal (1 dB precision)
+rssisd  | number | (unsigned integer) Standard deviation of RSSI during preamble
+lsnr    | number | (signed float) Lora SNR ratio in dB (0.1 dB precision)
+etime   | string | Encrypted 'main' fine timestamp, ns precision [0..999999999]
+foff    | number | Frequency offset in Hz [-125 kHz..+125 khz]
+ftstat  | number | (8 bits unsigned integer) Fine timestamp status
+ftver   | number | Version of the 'main' fine timestamp
+ftdelta | number | Number of nanoseconds between the 'main' fts and the 'alternative' one
+ */
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RSig {
+    pub ant: usize,
+    pub chan: u64,
+    pub rssic: i32,
+    pub rssis: Option<i32>,
+    pub lsnr: f32,
+    pub etime: Option<String>,
+    pub foff: Option<i64>,
+    pub ftstat: Option<u8>,
+    pub ftver: Option<usize>,
+    pub ftdelta: Option<isize>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum RxPk {
+    V1(RxPkV1),
+    V2(RxPkV2),
+}
+
+macro_rules! get_field {
+    ($self:expr, $field:ident) => {
+        match $self {
+            RxPk::V1(pk) => &pk.$field,
+            RxPk::V2(pk) => &pk.$field,
+        }
+    };
+}
+impl RxPk {
+    pub fn get_snr(&self) -> f32 {
+        match self {
+            RxPk::V1(pk) => pk.lsnr,
+            RxPk::V2(pk) => pk.rsig[0].lsnr,
+        }
+    }
+
+    pub fn get_rssi(&self) -> i32 {
+        match self {
+            RxPk::V1(pk) => pk.rssi,
+            RxPk::V2(pk) => {
+                // erlang implementation spec packet_rssi(map()) -> number()
+                // takes rssic so we will too
+                pk.rsig[0].rssic
+            }
+        }
+    }
+
+    pub fn get_frequency(&self) -> &f64 {
+        get_field!(self, freq)
+    }
+
+    pub fn get_data(&self) -> String {
+        get_field!(self, data).clone()
+    }
+
+    pub fn get_tmst(&self) -> &u64 {
+        get_field!(self, tmst)
+    }
 }
 
 /*
