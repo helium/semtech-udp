@@ -222,8 +222,12 @@ impl RxPk {
         get_field!(self, data).clone()
     }
 
-    pub fn get_tmst(&self) -> &u64 {
+    pub fn get_timestamp(&self) -> &u64 {
         get_field!(self, tmst)
+    }
+
+    pub fn get_datarate(&self) -> String {
+        get_field!(self, datr).clone()
     }
 }
 
