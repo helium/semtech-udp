@@ -148,7 +148,6 @@ pub struct RxPkV2 {
     pub delayed: Option<bool>,
     pub tmms: Option<u64>,
     pub time: Option<String>,
-
 }
 
 /*
