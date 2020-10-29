@@ -187,8 +187,7 @@ pub enum RxPk {
     V2(RxPkV2),
 }
 
-macro_rules! get_v1v2 {
-    // `()` indictes that the macro takes no argument.
+macro_rules! get_field {
     ($self:expr, $field:ident) => {
         match $self {
             RxPk::V1(pk) => &pk.$field,
@@ -216,15 +215,15 @@ impl RxPk {
     }
 
     pub fn get_frequency(&self) -> &f64 {
-        get_v1v2!(self, freq)
+        get_field!(self, freq)
     }
 
     pub fn get_data(&self) -> String {
-        get_v1v2!(self, data).clone()
+        get_field!(self, data).clone()
     }
 
     pub fn get_tmst(&self) -> &u64 {
-        get_v1v2!(self, tmst)
+        get_field!(self, tmst)
     }
 }
 
