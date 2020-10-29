@@ -133,21 +133,22 @@ data    | string | Base64 encoded RF packet payload, padded
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RxPkV2 {
-    pub jver: String,
-    pub brd: usize,
     pub aesk: usize,
-    pub delayed: bool,
-    pub rsig: Vec<RSig>,
+    pub brd: usize,
     pub codr: String,
     pub data: String,
     pub datr: String,
     pub freq: f64,
+    pub jver: usize,
     pub modu: String,
-    pub rfch: u64,
+    pub rsig: Vec<RSig>,
     pub size: u64,
     pub stat: u64,
     pub tmst: u64,
+    pub delayed: Option<bool>,
     pub tmms: Option<u64>,
+    pub time: Option<String>,
+
 }
 
 /*
@@ -171,16 +172,17 @@ pub struct RSig {
     pub ant: usize,
     pub chan: u64,
     pub rssic: i32,
-    pub rssis: i32,
+    pub rssis: Option<i32>,
     pub lsnr: f32,
-    pub etime: String,
-    pub foff: i64,
-    pub ftstat: u8,
-    pub ftver: usize,
-    pub ftdelta: isize,
+    pub etime: Option<String>,
+    pub foff: Option<i64>,
+    pub ftstat: Option<u8>,
+    pub ftver: Option<usize>,
+    pub ftdelta: Option<isize>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
 pub enum RxPk {
     V1(RxPkV1),
     V2(RxPkV2),

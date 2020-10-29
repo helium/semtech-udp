@@ -33,7 +33,8 @@ impl Parser for Packet {
                 Identifier::PushData => {
                     let gateway_mac = gateway_mac(&buffer[4..12]);
                     let json_str = std::str::from_utf8(&buffer[12..num_recv])?;
-                    let data = serde_json::from_str(json_str)?;
+                    let data = serde_json::from_str(json_str).unwrap();
+
                     push_data::Packet {
                         random_token,
                         gateway_mac,
