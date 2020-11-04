@@ -1,9 +1,9 @@
 use super::{
     parser::Parser, pull_resp, pull_resp::TxPk, Down, MacAddress, Packet, SerializablePacket, Up,
 };
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tokio::{
-    net::UdpSocket,
+    net::{udp::{RecvHalf, SendHalf}, UdpSocket},
     sync::{
         broadcast,
         mpsc::{self, Receiver, Sender},
@@ -42,7 +42,7 @@ pub type ClientRx = broadcast::Receiver<Event>;
 
 // receives UDP packets
 struct UdpRx {
-    socket_receiver: Arc<UdpSocket>,
+    socket_receiver: RecvHalf,
     udp_tx_sender: Sender<UdpMessage>,
     client_tx_sender: broadcast::Sender<Event>,
 }
@@ -52,7 +52,7 @@ struct UdpTx {
     receiver: Receiver<UdpMessage>,
     client_tx_sender: broadcast::Sender<Event>,
     clients: HashMap<MacAddress, SocketAddr>,
-    socket_sender: Arc<UdpSocket>,
+    socket_sender: SendHalf,
 }
 
 #[derive(Debug)]
@@ -65,18 +65,18 @@ use rand::Rng;
 #[derive(Debug)]
 pub enum Error {
     QueueFull(mpsc::error::SendError<(Packet, MacAddress)>),
-    AckChannelRecv(broadcast::error::RecvError),
+    AckChannelRecv(broadcast::RecvError),
     AckError(super::packet::tx_ack::Error),
     SendTimeout,
     UnknownMac,
     UdpError(std::io::Error),
-    ClientEventQueueFull(broadcast::error::SendError<Event>),
+    ClientEventQueueFull(broadcast::SendError<Event>),
     SocketEventQueueFull,
     SemtechUdpSerialization(super::packet::Error),
 }
 
-impl From<tokio::time::error::Elapsed> for Error {
-    fn from(_err: tokio::time::error::Elapsed) -> Error {
+impl From<tokio::time::Elapsed> for Error {
+    fn from(_err: tokio::time::Elapsed) -> Error {
         Error::SendTimeout
     }
 }
@@ -87,8 +87,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<broadcast::error::SendError<Event>> for Error {
-    fn from(err: broadcast::error::SendError<Event>) -> Error {
+impl From<broadcast::SendError<Event>> for Error {
+    fn from(err: broadcast::SendError<Event>) -> Error {
         Error::ClientEventQueueFull(err)
     }
 }
@@ -111,8 +111,8 @@ impl From<mpsc::error::SendError<(Packet, MacAddress)>> for Error {
     }
 }
 
-impl From<broadcast::error::RecvError> for Error {
-    fn from(e: broadcast::error::RecvError) -> Self {
+impl From<broadcast::RecvError> for Error {
+    fn from(e: broadcast::RecvError) -> Self {
         Error::AckChannelRecv(e)
     }
 }
@@ -133,7 +133,7 @@ pub struct PreparedSend {
 
 impl PreparedSend {
     async fn just_dispatch(self) -> Result<(), Error> {
-        let (sender, mut receiver) = (self.sender, self.receiver);
+        let (mut sender, mut receiver) = (self.sender, self.receiver);
         // send it to UdpTx channel
         sender
             .send(UdpMessage::PacketByMac((self.packet.into(), self.mac)))
@@ -223,14 +223,13 @@ impl UdpRuntime {
         self.tx.prepare_send(txpk, mac)
     }
 
-    pub async fn recv(&mut self) -> Result<Event, broadcast::error::RecvError> {
+    pub async fn recv(&mut self) -> Result<Event, broadcast::RecvError> {
         self.rx.recv().await
     }
 
     pub async fn new(addr: SocketAddr) -> Result<UdpRuntime, Error> {
         let socket = UdpSocket::bind(&addr).await?;
-        let socket_receiver = Arc::new(socket);
-        let socket_sender = socket_receiver.clone();
+        let (socket_receiver, socket_sender) = socket.split();
 
         let (udp_tx_sender, udp_tx_receiver) = mpsc::channel(100);
 
@@ -294,7 +293,7 @@ impl UdpRuntime {
 // }
 
 impl UdpRx {
-    pub async fn run(self) -> Result<(), Error> {
+    pub async fn run(mut self) -> Result<(), Error> {
         let mut buf = vec![0u8; 1024];
         loop {
             match self.socket_receiver.recv_from(&mut buf).await {
@@ -324,7 +323,7 @@ impl UdpRx {
 
                                         // send the ack_packet
                                         let ack_packet = pull_data.into_ack();
-                                        let udp_tx = self.udp_tx_sender.clone();
+                                        let mut udp_tx = self.udp_tx_sender.clone();
                                         udp_tx
                                             .send(UdpMessage::PacketByMac((ack_packet.into(), mac)))
                                             .await?
