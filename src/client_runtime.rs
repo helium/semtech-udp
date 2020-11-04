@@ -5,7 +5,10 @@
 */
 use super::{parser::Parser, pull_data, Down, MacAddress, Packet, SerializablePacket, Up};
 use std::net::SocketAddr;
-use tokio::net::{UdpSocket, udp::{RecvHalf, SendHalf}};
+use tokio::net::{
+    udp::{RecvHalf, SendHalf},
+    UdpSocket,
+};
 use tokio::sync::{
     broadcast,
     mpsc::{self, Receiver, Sender},

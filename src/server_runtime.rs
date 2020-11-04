@@ -3,7 +3,10 @@ use super::{
 };
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tokio::{
-    net::{udp::{RecvHalf, SendHalf}, UdpSocket},
+    net::{
+        udp::{RecvHalf, SendHalf},
+        UdpSocket,
+    },
     sync::{
         broadcast,
         mpsc::{self, Receiver, Sender},
