@@ -136,7 +136,6 @@ pub struct Downlink {
 }
 
 impl Downlink {
-
     pub fn set_packet(&mut self, txpk: TxPk) {
         self.packet = Some(pull_resp::Packet {
             random_token: self.random_token,
@@ -176,7 +175,6 @@ impl Downlink {
         } else {
             Err(Error::DispatchWithNoSendPacket)
         }
-
     }
 
     pub async fn dispatch(self, timeout_duration: Option<Duration>) -> Result<(), Error> {
@@ -204,13 +202,11 @@ impl ClientTx {
         let random_token = rand::thread_rng().gen();
 
         let packet = if let Some(txpk) = txpk {
-
             // create pull_resp frame with the data
             Some(pull_resp::Packet {
                 random_token,
                 data: pull_resp::Data::from_txpk(txpk),
             })
-
         } else {
             None
         };
@@ -440,7 +436,6 @@ impl std::fmt::Display for Error {
             }
             Error::SendTimeout => format!("Sending RF Packet Timed Out"),
             Error::DispatchWithNoSendPacket => format!("Dispatched PreparedSend with no Packet"),
-
         };
         write!(f, "{}", msg)
     }
