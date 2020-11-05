@@ -358,7 +358,6 @@ impl UdpTx {
     }
 }
 
-
 impl From<tokio::time::Elapsed> for Error {
     fn from(_err: tokio::time::Elapsed) -> Error {
         Error::SendTimeout
@@ -406,7 +405,6 @@ impl From<super::packet::tx_ack::Error> for Error {
         Error::AckError(e)
     }
 }
-
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
