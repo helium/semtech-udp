@@ -71,6 +71,7 @@ pub enum Error {
     AckChannelRecv(broadcast::RecvError),
     AckError(super::packet::tx_ack::Error),
     SendTimeout,
+    DispatchWithNoSendPacket,
     UnknownMac,
     UdpError(std::io::Error),
     ClientEventQueueFull(broadcast::SendError<Event>),
@@ -129,39 +130,53 @@ impl From<super::packet::tx_ack::Error> for Error {
 pub struct PreparedSend {
     random_token: u16,
     mac: MacAddress,
-    packet: pull_resp::Packet,
+    packet: Option<pull_resp::Packet>,
     sender: Sender<UdpMessage>,
     receiver: broadcast::Receiver<Event>,
 }
 
 impl PreparedSend {
+
+    pub fn set_packet(&mut self, txpk: TxPk) {
+        self.packet = Some(pull_resp::Packet {
+            random_token: self.random_token,
+            data: pull_resp::Data::from_txpk(txpk),
+        });
+    }
+
     async fn just_dispatch(self) -> Result<(), Error> {
         let (mut sender, mut receiver) = (self.sender, self.receiver);
-        // send it to UdpTx channel
-        sender
-            .send(UdpMessage::PacketByMac((self.packet.into(), self.mac)))
-            .await?;
 
-        // loop over responses until the TxAck is received
-        loop {
-            match receiver.recv().await? {
-                Event::Packet(packet) => {
-                    if let Up::TxAck(ack) = packet {
-                        if ack.random_token == self.random_token {
-                            return if let Some(error) = ack.get_error() {
-                                Err(error.into())
-                            } else {
-                                Ok(())
-                            };
+        if let Some(packet) = self.packet {
+            // send it to UdpTx channel
+            sender
+                .send(UdpMessage::PacketByMac((packet.into(), self.mac)))
+                .await?;
+
+            // loop over responses until the TxAck is received
+            loop {
+                match receiver.recv().await? {
+                    Event::Packet(packet) => {
+                        if let Up::TxAck(ack) = packet {
+                            if ack.random_token == self.random_token {
+                                return if let Some(error) = ack.get_error() {
+                                    Err(error.into())
+                                } else {
+                                    Ok(())
+                                };
+                            }
                         }
                     }
+                    Event::NoClientWithMac(_packet, _mac) => {
+                        return Err(Error::UnknownMac);
+                    }
+                    _ => (),
                 }
-                Event::NoClientWithMac(_packet, _mac) => {
-                    return Err(Error::UnknownMac);
-                }
-                _ => (),
             }
+        } else {
+            Err(Error::DispatchWithNoSendPacket)
         }
+
     }
 
     pub async fn dispatch(self, timeout_duration: Option<Duration>) -> Result<(), Error> {
@@ -180,18 +195,24 @@ impl ClientTx {
         mac: MacAddress,
         timeout: Option<Duration>,
     ) -> Result<(), Error> {
-        let prepared_send = self.prepare_send(txpk, mac);
+        let prepared_send = self.prepare_send(Some(txpk), mac);
         prepared_send.dispatch(timeout).await
     }
 
-    pub fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> PreparedSend {
+    pub fn prepare_send(&mut self, txpk: Option<TxPk>, mac: MacAddress) -> PreparedSend {
         // assign random token
         let random_token = rand::thread_rng().gen();
 
-        // create pull_resp frame with the data
-        let packet = pull_resp::Packet {
-            random_token,
-            data: pull_resp::Data::from_txpk(txpk),
+        let packet = if let Some(txpk) = txpk {
+
+            // create pull_resp frame with the data
+            Some(pull_resp::Packet {
+                random_token,
+                data: pull_resp::Data::from_txpk(txpk),
+            })
+
+        } else {
+            None
         };
 
         PreparedSend {
@@ -222,8 +243,12 @@ impl UdpRuntime {
         self.tx.send(txpk, mac, timeout).await
     }
 
+    pub fn empty_prepare_send(&mut self, mac: MacAddress) -> PreparedSend {
+        self.tx.prepare_send(None, mac)
+    }
+
     pub fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> PreparedSend {
-        self.tx.prepare_send(txpk, mac)
+        self.tx.prepare_send(Some(txpk), mac)
     }
 
     pub async fn recv(&mut self) -> Result<Event, broadcast::RecvError> {
@@ -414,6 +439,8 @@ impl std::fmt::Display for Error {
                 format!("SemtechUdpSerilaization Error: {:?}", err)
             }
             Error::SendTimeout => format!("Sending RF Packet Timed Out"),
+            Error::DispatchWithNoSendPacket => format!("Dispatched PreparedSend with no Packet"),
+
         };
         write!(f, "{}", msg)
     }
@@ -433,6 +460,7 @@ impl StdError for Error {
             Error::SocketEventQueueFull => "Internal UDP buffer full",
             Error::SemtechUdpSerialization(_) => "SemtechUdpSerilaization Error",
             Error::SendTimeout => "Sending RF Packet Timed Out",
+            Error::DispatchWithNoSendPacket => "Dispatched PreparedSend with no Packet",
         }
     }
 }
