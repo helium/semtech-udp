@@ -195,11 +195,11 @@ impl ClientTx {
         mac: MacAddress,
         timeout: Option<Duration>,
     ) -> Result<(), Error> {
-        let prepared_send = self.prepare_send(Some(txpk), mac);
+        let prepared_send = self.prepare_downlink(Some(txpk), mac);
         prepared_send.dispatch(timeout).await
     }
 
-    pub fn prepare_send(&mut self, txpk: Option<TxPk>, mac: MacAddress) -> Downlink {
+    pub fn prepare_downlink(&mut self, txpk: Option<TxPk>, mac: MacAddress) -> Downlink {
         // assign random token
         let random_token = rand::thread_rng().gen();
 
@@ -243,12 +243,12 @@ impl UdpRuntime {
         self.tx.send(txpk, mac, timeout).await
     }
 
-    pub fn empty_prepare_send(&mut self, mac: MacAddress) -> Downlink {
-        self.tx.prepare_send(None, mac)
+    pub fn prepare_empty_downlink(&mut self, mac: MacAddress) -> Downlink {
+        self.tx.prepare_downlink(None, mac)
     }
 
-    pub fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> Downlink {
-        self.tx.prepare_send(Some(txpk), mac)
+    pub fn prepare_downlink(&mut self, txpk: TxPk, mac: MacAddress) -> Downlink {
+        self.tx.prepare_downlink(Some(txpk), mac)
     }
 
     pub async fn recv(&mut self) -> Result<Event, broadcast::RecvError> {
