@@ -79,54 +79,6 @@ pub enum Error {
     SemtechUdpSerialization(super::packet::Error),
 }
 
-impl From<tokio::time::Elapsed> for Error {
-    fn from(_err: tokio::time::Elapsed) -> Error {
-        Error::SendTimeout
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Error {
-        Error::UdpError(err)
-    }
-}
-
-impl From<broadcast::SendError<Event>> for Error {
-    fn from(err: broadcast::SendError<Event>) -> Error {
-        Error::ClientEventQueueFull(err)
-    }
-}
-
-impl From<mpsc::error::SendError<UdpMessage>> for Error {
-    fn from(_err: mpsc::error::SendError<UdpMessage>) -> Error {
-        Error::SocketEventQueueFull
-    }
-}
-
-impl From<super::packet::Error> for Error {
-    fn from(err: super::packet::Error) -> Error {
-        Error::SemtechUdpSerialization(err)
-    }
-}
-
-impl From<mpsc::error::SendError<(Packet, MacAddress)>> for Error {
-    fn from(e: mpsc::error::SendError<(Packet, MacAddress)>) -> Self {
-        Error::QueueFull(e)
-    }
-}
-
-impl From<broadcast::RecvError> for Error {
-    fn from(e: broadcast::RecvError) -> Self {
-        Error::AckChannelRecv(e)
-    }
-}
-
-impl From<super::packet::tx_ack::Error> for Error {
-    fn from(e: super::packet::tx_ack::Error) -> Self {
-        Error::AckError(e)
-    }
-}
-
 pub struct Downlink {
     random_token: u16,
     mac: MacAddress,
@@ -302,19 +254,6 @@ impl UdpRuntime {
         })
     }
 }
-//
-// impl ClientRxTranslator {
-//     pub async fn run(mut self) -> Result<(), Error> {
-//         loop {
-//             let msg = self.receiver.recv().await;
-//             if let Some((packet, mac)) = msg {
-//                 self.udp_tx_sender
-//                     .send(UdpMessage::PacketByMac((packet, mac)))
-//                     .await?;
-//             }
-//         }
-//     }
-// }
 
 impl UdpRx {
     pub async fn run(mut self) -> Result<(), Error> {
@@ -418,6 +357,56 @@ impl UdpTx {
         }
     }
 }
+
+
+impl From<tokio::time::Elapsed> for Error {
+    fn from(_err: tokio::time::Elapsed) -> Error {
+        Error::SendTimeout
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Error {
+        Error::UdpError(err)
+    }
+}
+
+impl From<broadcast::SendError<Event>> for Error {
+    fn from(err: broadcast::SendError<Event>) -> Error {
+        Error::ClientEventQueueFull(err)
+    }
+}
+
+impl From<mpsc::error::SendError<UdpMessage>> for Error {
+    fn from(_err: mpsc::error::SendError<UdpMessage>) -> Error {
+        Error::SocketEventQueueFull
+    }
+}
+
+impl From<super::packet::Error> for Error {
+    fn from(err: super::packet::Error) -> Error {
+        Error::SemtechUdpSerialization(err)
+    }
+}
+
+impl From<mpsc::error::SendError<(Packet, MacAddress)>> for Error {
+    fn from(e: mpsc::error::SendError<(Packet, MacAddress)>) -> Self {
+        Error::QueueFull(e)
+    }
+}
+
+impl From<broadcast::RecvError> for Error {
+    fn from(e: broadcast::RecvError) -> Self {
+        Error::AckChannelRecv(e)
+    }
+}
+
+impl From<super::packet::tx_ack::Error> for Error {
+    fn from(e: super::packet::tx_ack::Error) -> Self {
+        Error::AckError(e)
+    }
+}
+
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
