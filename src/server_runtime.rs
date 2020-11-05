@@ -127,7 +127,7 @@ impl From<super::packet::tx_ack::Error> for Error {
     }
 }
 
-pub struct PreparedSend {
+pub struct Downlink {
     random_token: u16,
     mac: MacAddress,
     packet: Option<pull_resp::Packet>,
@@ -135,7 +135,7 @@ pub struct PreparedSend {
     receiver: broadcast::Receiver<Event>,
 }
 
-impl PreparedSend {
+impl Downlink {
 
     pub fn set_packet(&mut self, txpk: TxPk) {
         self.packet = Some(pull_resp::Packet {
@@ -199,7 +199,7 @@ impl ClientTx {
         prepared_send.dispatch(timeout).await
     }
 
-    pub fn prepare_send(&mut self, txpk: Option<TxPk>, mac: MacAddress) -> PreparedSend {
+    pub fn prepare_send(&mut self, txpk: Option<TxPk>, mac: MacAddress) -> Downlink {
         // assign random token
         let random_token = rand::thread_rng().gen();
 
@@ -215,7 +215,7 @@ impl ClientTx {
             None
         };
 
-        PreparedSend {
+        Downlink {
             random_token,
             mac,
             packet,
@@ -243,11 +243,11 @@ impl UdpRuntime {
         self.tx.send(txpk, mac, timeout).await
     }
 
-    pub fn empty_prepare_send(&mut self, mac: MacAddress) -> PreparedSend {
+    pub fn empty_prepare_send(&mut self, mac: MacAddress) -> Downlink {
         self.tx.prepare_send(None, mac)
     }
 
-    pub fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> PreparedSend {
+    pub fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> Downlink {
         self.tx.prepare_send(Some(txpk), mac)
     }
 
