@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 };
 
                                 let prepared_send =
-                                    udp_runtime.prepare_send(txpk, packet.gateway_mac);
+                                    udp_runtime.prepare_downlink(txpk, packet.gateway_mac);
 
                                 tokio::spawn(async move {
                                     if let Err(e) =

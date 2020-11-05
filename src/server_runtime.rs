@@ -71,6 +71,7 @@ pub enum Error {
     AckChannelRecv(broadcast::RecvError),
     AckError(super::packet::tx_ack::Error),
     SendTimeout,
+    DispatchWithNoSendPacket,
     UnknownMac,
     UdpError(std::io::Error),
     ClientEventQueueFull(broadcast::SendError<Event>),
@@ -78,89 +79,53 @@ pub enum Error {
     SemtechUdpSerialization(super::packet::Error),
 }
 
-impl From<tokio::time::Elapsed> for Error {
-    fn from(_err: tokio::time::Elapsed) -> Error {
-        Error::SendTimeout
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Error {
-        Error::UdpError(err)
-    }
-}
-
-impl From<broadcast::SendError<Event>> for Error {
-    fn from(err: broadcast::SendError<Event>) -> Error {
-        Error::ClientEventQueueFull(err)
-    }
-}
-
-impl From<mpsc::error::SendError<UdpMessage>> for Error {
-    fn from(_err: mpsc::error::SendError<UdpMessage>) -> Error {
-        Error::SocketEventQueueFull
-    }
-}
-
-impl From<super::packet::Error> for Error {
-    fn from(err: super::packet::Error) -> Error {
-        Error::SemtechUdpSerialization(err)
-    }
-}
-
-impl From<mpsc::error::SendError<(Packet, MacAddress)>> for Error {
-    fn from(e: mpsc::error::SendError<(Packet, MacAddress)>) -> Self {
-        Error::QueueFull(e)
-    }
-}
-
-impl From<broadcast::RecvError> for Error {
-    fn from(e: broadcast::RecvError) -> Self {
-        Error::AckChannelRecv(e)
-    }
-}
-
-impl From<super::packet::tx_ack::Error> for Error {
-    fn from(e: super::packet::tx_ack::Error) -> Self {
-        Error::AckError(e)
-    }
-}
-
-pub struct PreparedSend {
+pub struct Downlink {
     random_token: u16,
     mac: MacAddress,
-    packet: pull_resp::Packet,
+    packet: Option<pull_resp::Packet>,
     sender: Sender<UdpMessage>,
     receiver: broadcast::Receiver<Event>,
 }
 
-impl PreparedSend {
+impl Downlink {
+    pub fn set_packet(&mut self, txpk: TxPk) {
+        self.packet = Some(pull_resp::Packet {
+            random_token: self.random_token,
+            data: pull_resp::Data::from_txpk(txpk),
+        });
+    }
+
     async fn just_dispatch(self) -> Result<(), Error> {
         let (mut sender, mut receiver) = (self.sender, self.receiver);
-        // send it to UdpTx channel
-        sender
-            .send(UdpMessage::PacketByMac((self.packet.into(), self.mac)))
-            .await?;
 
-        // loop over responses until the TxAck is received
-        loop {
-            match receiver.recv().await? {
-                Event::Packet(packet) => {
-                    if let Up::TxAck(ack) = packet {
-                        if ack.random_token == self.random_token {
-                            return if let Some(error) = ack.get_error() {
-                                Err(error.into())
-                            } else {
-                                Ok(())
-                            };
+        if let Some(packet) = self.packet {
+            // send it to UdpTx channel
+            sender
+                .send(UdpMessage::PacketByMac((packet.into(), self.mac)))
+                .await?;
+
+            // loop over responses until the TxAck is received
+            loop {
+                match receiver.recv().await? {
+                    Event::Packet(packet) => {
+                        if let Up::TxAck(ack) = packet {
+                            if ack.random_token == self.random_token {
+                                return if let Some(error) = ack.get_error() {
+                                    Err(error.into())
+                                } else {
+                                    Ok(())
+                                };
+                            }
                         }
                     }
+                    Event::NoClientWithMac(_packet, _mac) => {
+                        return Err(Error::UnknownMac);
+                    }
+                    _ => (),
                 }
-                Event::NoClientWithMac(_packet, _mac) => {
-                    return Err(Error::UnknownMac);
-                }
-                _ => (),
             }
+        } else {
+            Err(Error::DispatchWithNoSendPacket)
         }
     }
 
@@ -180,21 +145,25 @@ impl ClientTx {
         mac: MacAddress,
         timeout: Option<Duration>,
     ) -> Result<(), Error> {
-        let prepared_send = self.prepare_send(txpk, mac);
+        let prepared_send = self.prepare_downlink(Some(txpk), mac);
         prepared_send.dispatch(timeout).await
     }
 
-    pub fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> PreparedSend {
+    pub fn prepare_downlink(&mut self, txpk: Option<TxPk>, mac: MacAddress) -> Downlink {
         // assign random token
         let random_token = rand::thread_rng().gen();
 
-        // create pull_resp frame with the data
-        let packet = pull_resp::Packet {
-            random_token,
-            data: pull_resp::Data::from_txpk(txpk),
+        let packet = if let Some(txpk) = txpk {
+            // create pull_resp frame with the data
+            Some(pull_resp::Packet {
+                random_token,
+                data: pull_resp::Data::from_txpk(txpk),
+            })
+        } else {
+            None
         };
 
-        PreparedSend {
+        Downlink {
             random_token,
             mac,
             packet,
@@ -222,8 +191,12 @@ impl UdpRuntime {
         self.tx.send(txpk, mac, timeout).await
     }
 
-    pub fn prepare_send(&mut self, txpk: TxPk, mac: MacAddress) -> PreparedSend {
-        self.tx.prepare_send(txpk, mac)
+    pub fn prepare_empty_downlink(&mut self, mac: MacAddress) -> Downlink {
+        self.tx.prepare_downlink(None, mac)
+    }
+
+    pub fn prepare_downlink(&mut self, txpk: TxPk, mac: MacAddress) -> Downlink {
+        self.tx.prepare_downlink(Some(txpk), mac)
     }
 
     pub async fn recv(&mut self) -> Result<Event, broadcast::RecvError> {
@@ -281,19 +254,6 @@ impl UdpRuntime {
         })
     }
 }
-//
-// impl ClientRxTranslator {
-//     pub async fn run(mut self) -> Result<(), Error> {
-//         loop {
-//             let msg = self.receiver.recv().await;
-//             if let Some((packet, mac)) = msg {
-//                 self.udp_tx_sender
-//                     .send(UdpMessage::PacketByMac((packet, mac)))
-//                     .await?;
-//             }
-//         }
-//     }
-// }
 
 impl UdpRx {
     pub async fn run(mut self) -> Result<(), Error> {
@@ -398,6 +358,54 @@ impl UdpTx {
     }
 }
 
+impl From<tokio::time::Elapsed> for Error {
+    fn from(_err: tokio::time::Elapsed) -> Error {
+        Error::SendTimeout
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Error {
+        Error::UdpError(err)
+    }
+}
+
+impl From<broadcast::SendError<Event>> for Error {
+    fn from(err: broadcast::SendError<Event>) -> Error {
+        Error::ClientEventQueueFull(err)
+    }
+}
+
+impl From<mpsc::error::SendError<UdpMessage>> for Error {
+    fn from(_err: mpsc::error::SendError<UdpMessage>) -> Error {
+        Error::SocketEventQueueFull
+    }
+}
+
+impl From<super::packet::Error> for Error {
+    fn from(err: super::packet::Error) -> Error {
+        Error::SemtechUdpSerialization(err)
+    }
+}
+
+impl From<mpsc::error::SendError<(Packet, MacAddress)>> for Error {
+    fn from(e: mpsc::error::SendError<(Packet, MacAddress)>) -> Self {
+        Error::QueueFull(e)
+    }
+}
+
+impl From<broadcast::RecvError> for Error {
+    fn from(e: broadcast::RecvError) -> Self {
+        Error::AckChannelRecv(e)
+    }
+}
+
+impl From<super::packet::tx_ack::Error> for Error {
+    fn from(e: super::packet::tx_ack::Error) -> Self {
+        Error::AckError(e)
+    }
+}
+
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let msg = match self {
@@ -414,6 +422,7 @@ impl std::fmt::Display for Error {
                 format!("SemtechUdpSerilaization Error: {:?}", err)
             }
             Error::SendTimeout => format!("Sending RF Packet Timed Out"),
+            Error::DispatchWithNoSendPacket => format!("Dispatched PreparedSend with no Packet"),
         };
         write!(f, "{}", msg)
     }
@@ -433,6 +442,7 @@ impl StdError for Error {
             Error::SocketEventQueueFull => "Internal UDP buffer full",
             Error::SemtechUdpSerialization(_) => "SemtechUdpSerilaization Error",
             Error::SendTimeout => "Sending RF Packet Timed Out",
+            Error::DispatchWithNoSendPacket => "Dispatched PreparedSend with no Packet",
         }
     }
 }
