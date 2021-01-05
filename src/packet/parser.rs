@@ -1,6 +1,10 @@
 use super::*;
 use std::convert::TryFrom;
 
+const PROTOCOL_VERSION_INDEX: usize = 0;
+const IDENTIFIER_INDEX: usize = 3;
+const PACKET_PAYLOAD_START: usize = 8;
+
 fn random_token(buffer: &[u8]) -> u16 {
     (buffer[1] as u16) << 8 | buffer[2] as u16
 }
@@ -10,64 +14,67 @@ pub fn gateway_mac(buffer: &[u8]) -> MacAddress {
 }
 
 pub trait Parser {
-    fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Error>;
+    fn parse(buffer: &[u8]) -> std::result::Result<Packet, Error>;
 }
 
 impl Parser for Packet {
-    fn parse(buffer: &[u8], num_recv: usize) -> std::result::Result<Packet, Error> {
-        if buffer[0] != PROTOCOL_VERSION {
-            Err(Error::InvalidProtocolVersion)
-        } else if let Ok(id) = Identifier::try_from(buffer[3]) {
-            // all packets have random_token
-            let random_token = random_token(buffer);
-            Ok(match id {
-                // up packets
-                Identifier::PullData => {
-                    let gateway_mac = gateway_mac(&buffer[4..12]);
-                    pull_data::Packet {
-                        random_token,
-                        gateway_mac,
-                    }
-                    .into()
-                }
-                Identifier::PushData => {
-                    let gateway_mac = gateway_mac(&buffer[4..12]);
-                    let json_str = std::str::from_utf8(&buffer[12..num_recv])?;
-                    let data = serde_json::from_str(json_str)?;
+    fn parse(buffer: &[u8]) -> std::result::Result<Packet, Error> {
+        if buffer[PROTOCOL_VERSION_INDEX] != PROTOCOL_VERSION {
+            return Err(Error::InvalidProtocolVersion);
+        };
 
-                    push_data::Packet {
-                        random_token,
-                        gateway_mac,
-                        data,
+        match Identifier::try_from(buffer[IDENTIFIER_INDEX]) {
+            Err(_) => Err(Error::InvalidIdentifier),
+            Ok(id) => {
+                let random_token = random_token(buffer);
+                let buffer = &buffer[4..];
+                Ok(match id {
+                    // up packets
+                    Identifier::PullData => {
+                        let gateway_mac = gateway_mac(&buffer[..PACKET_PAYLOAD_START]);
+                        pull_data::Packet {
+                            random_token,
+                            gateway_mac,
+                        }
+                        .into()
                     }
-                    .into()
-                }
-                Identifier::TxAck => {
-                    let gateway_mac = gateway_mac(&buffer[4..12]);
-                    let data = if num_recv > 12 {
-                        let json_str = std::str::from_utf8(&buffer[12..num_recv])?;
-                        Some(serde_json::from_str(json_str).unwrap())
-                    } else {
-                        None
-                    };
-                    tx_ack::Packet {
-                        random_token,
-                        gateway_mac,
-                        data,
+                    Identifier::PushData => {
+                        let gateway_mac = gateway_mac(&buffer[..PACKET_PAYLOAD_START]);
+                        let json_str = std::str::from_utf8(&buffer[PACKET_PAYLOAD_START..])?;
+                        let data = serde_json::from_str(json_str)?;
+
+                        push_data::Packet {
+                            random_token,
+                            gateway_mac,
+                            data,
+                        }
+                        .into()
                     }
-                    .into()
-                }
-                // down packets
-                Identifier::PushAck => push_ack::Packet { random_token }.into(),
-                Identifier::PullAck => pull_ack::Packet { random_token }.into(),
-                Identifier::PullResp => {
-                    let json_str = std::str::from_utf8(&buffer[4..num_recv])?;
-                    let data = serde_json::from_str(json_str)?;
-                    pull_resp::Packet { random_token, data }.into()
-                }
-            })
-        } else {
-            Err(Error::InvalidIdentifier)
+                    Identifier::TxAck => {
+                        let gateway_mac = gateway_mac(&buffer[..PACKET_PAYLOAD_START]);
+                        let data = if buffer.len() > PACKET_PAYLOAD_START {
+                            let json_str = std::str::from_utf8(&buffer[PACKET_PAYLOAD_START..])?;
+                            Some(serde_json::from_str(json_str).unwrap())
+                        } else {
+                            None
+                        };
+                        tx_ack::Packet {
+                            random_token,
+                            gateway_mac,
+                            data,
+                        }
+                        .into()
+                    }
+                    // down packets
+                    Identifier::PushAck => push_ack::Packet { random_token }.into(),
+                    Identifier::PullAck => pull_ack::Packet { random_token }.into(),
+                    Identifier::PullResp => {
+                        let json_str = std::str::from_utf8(&buffer)?;
+                        let data = serde_json::from_str(json_str)?;
+                        pull_resp::Packet { random_token, data }.into()
+                    }
+                })
+            }
         }
     }
 }

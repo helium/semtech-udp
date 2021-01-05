@@ -147,7 +147,7 @@ impl UdpRuntimeRx {
         loop {
             match self.socket_recv.recv(&mut buf).await {
                 Ok(n) => {
-                    let packet = Packet::parse(&buf[0..n], n)?;
+                    let packet = Packet::parse(&buf[0..n])?;
                     match packet {
                         Packet::Up(_) => panic!("Should not be receiving any up packets"),
                         Packet::Down(down) => match down.clone() {

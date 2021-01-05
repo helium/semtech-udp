@@ -262,7 +262,7 @@ impl UdpRx {
             match self.socket_receiver.recv_from(&mut buf).await {
                 Err(e) => return Err(e.into()),
                 Ok((n, src)) => {
-                    let packet = if let Ok(packet) = Packet::parse(&buf[0..n], n) {
+                    let packet = if let Ok(packet) = Packet::parse(&buf[0..n]) {
                         Some(packet)
                     } else {
                         let mut vec = Vec::new();
