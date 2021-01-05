@@ -166,6 +166,8 @@ impl UdpRuntimeRx {
                 }
                 Err(e) => {
                     println!("Socket receive error: {}", e);
+                    // back off of CPU
+                    sleep(Duration::from_secs(10)).await;
                 }
             }
         }
@@ -199,6 +201,8 @@ impl UdpRuntimeTx {
 
                 if let Err(e) = self.socket_send.send(&buf[..n]).await {
                     println!("Socket error: {}", e);
+                    // back off of CPU
+                    sleep(Duration::from_secs(10)).await;
                 }
             }
         }
