@@ -69,33 +69,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Ready for clients");
     loop {
-        if let Some(event) = client_rx.recv().await {
-            match event {
-                Event::UnableToParseUdpFrame(buf) => {
-                    println!("Semtech UDP Parsing Error");
-                    println!("UDP data: {:?}", buf);
-                }
-                Event::NewClient((mac, addr)) => {
-                    println!("New packet forwarder client: {}, {}", mac, addr);
-
-                    // unlock the tx thread by sending it the gateway mac of the
-                    // the first client (connection via PULL_DATA frame)
-                    if let Some(tx) = tx.take() {
-                        tx.send(mac).unwrap();
-                    }
-                }
-                Event::UpdateClient((mac, addr)) => {
-                    println!("Mac existed, but IP updated: {}, {}", mac, addr);
-                }
-                Event::PacketReceived(rxpk, addr) => {
-                    println!("Packet Receveived from {}:", addr);
-                    println!("{:?}", rxpk);
-                }
-                Event::NoClientWithMac(_packet, mac) => {
-                    println!("Tried to send to client with unknown MAC: {:?}", mac)
-                }
-                Event::RawPacket(_) => (),
+        match client_rx.recv().await {
+            Event::UnableToParseUdpFrame(buf) => {
+                println!("Semtech UDP Parsing Error");
+                println!("UDP data: {:?}", buf);
             }
+            Event::NewClient((mac, addr)) => {
+                println!("New packet forwarder client: {}, {}", mac, addr);
+
+                // unlock the tx thread by sending it the gateway mac of the
+                // the first client (connection via PULL_DATA frame)
+                if let Some(tx) = tx.take() {
+                    tx.send(mac).unwrap();
+                }
+            }
+            Event::UpdateClient((mac, addr)) => {
+                println!("Mac existed, but IP updated: {}, {}", mac, addr);
+            }
+            Event::PacketReceived(rxpk, addr) => {
+                println!("Packet Receveived from {}:", addr);
+                println!("{:?}", rxpk);
+            }
+            Event::NoClientWithMac(_packet, mac) => {
+                println!("Tried to send to client with unknown MAC: {:?}", mac)
+            }
+            Event::RawPacket(_) => (),
         }
     }
 }

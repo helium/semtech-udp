@@ -45,7 +45,10 @@ pub struct ClientTx {
 }
 
 // sends packets to clients
-pub type ClientRx = mpsc::Receiver<Event>;
+#[derive(Debug)]
+pub struct ClientRx {
+    receiver: mpsc::Receiver<Event>,
+}
 
 // receives and parses UDP packets
 struct UdpRx {
@@ -129,6 +132,14 @@ impl Downlink {
     }
 }
 
+impl ClientRx {
+    pub async fn recv(&mut self) -> Event {
+        // we unwrap here because the send channel is dropped only iff ClientRx is dropped
+        // ClientRx panics before it can get dropped (see UdpRuntime
+        self.receiver.recv().await.unwrap()
+    }
+}
+
 impl ClientTx {
     pub async fn send(
         &mut self,
@@ -189,7 +200,7 @@ impl UdpRuntime {
         self.tx.prepare_downlink(Some(txpk), mac)
     }
 
-    pub async fn recv(&mut self) -> Option<Event> {
+    pub async fn recv(&mut self) -> Event {
         self.rx.recv().await
     }
 
@@ -200,11 +211,13 @@ impl UdpRuntime {
         let (udp_tx_sender, udp_tx_receiver) = mpsc::channel(100);
         let (client_tx_sender, client_tx_receiver) = mpsc::channel(100);
 
-        let client_tx = client_tx_receiver;
-
-        let client_rx = ClientTx {
+        let client_tx = ClientTx {
             sender: udp_tx_sender.clone(),
             receiver_copier: client_tx_sender.clone(),
+        };
+
+        let client_rx = ClientRx {
+            receiver: client_tx_receiver,
         };
 
         let udp_rx = UdpRx {
@@ -224,6 +237,8 @@ impl UdpRuntime {
         // and sends packets to relevant parties
         tokio::spawn(async move {
             if let Err(e) = udp_rx.run().await {
+                // we panic here because the ony error case here
+                // if we lost the local socket somehow
                 panic!("UdpRx threw error: {:?}", e)
             }
         });
@@ -232,13 +247,15 @@ impl UdpRuntime {
         // gateway to IP map
         tokio::spawn(async move {
             if let Err(e) = udp_tx.run().await {
+                // we panic here because the ony error case here
+                // if we lost the local socket somehow
                 panic!("UdpTx threw error: {:?}", e)
             }
         });
 
         Ok(UdpRuntime {
-            rx: client_tx,
-            tx: client_rx,
+            rx: client_rx,
+            tx: client_tx,
         })
     }
 }
