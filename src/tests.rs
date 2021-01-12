@@ -5,7 +5,7 @@ fn test_pull_data() {
     let recv = [
         0x2, 0x9F, 0x92, 0x2, 0xAA, 0x55, 0x5A, 0x1, 0x2, 0x3, 0x4, 0x5,
     ];
-    let packet = Packet::parse(&recv, recv.len()).unwrap();
+    let packet = Packet::parse(&recv).unwrap();
 
     if let Packet::Up(Up::PullData(packet)) = packet {
         let mut buffer = [0; 512];
@@ -39,12 +39,12 @@ fn test_push_data_rxpk() {
         0x44, 0x59, 0x43, 0x4E, 0x72, 0x41, 0x3D, 0x22, 0x7D, 0x5D, 0x7D,
     ];
 
-    let packet = Packet::parse(&recv, recv.len()).unwrap();
+    let packet = Packet::parse(&recv).unwrap();
 
     if let Packet::Up(Up::PushData(packet)) = packet {
         let mut buffer = [0; 512];
         let written = packet.serialize(&mut buffer).unwrap();
-        let _packet = Packet::parse(&buffer, written as usize).unwrap();
+        let _packet = Packet::parse(&buffer[..written as usize]).unwrap();
     } else {
         assert!(false);
     }
@@ -68,12 +68,12 @@ fn test_push_data_rxpk_jsonv2() {
         51, 49, 51, 57, 57, 56, 56, 55, 54, 125, 93, 125,
     ];
 
-    let packet = Packet::parse(&recv, recv.len()).unwrap();
+    let packet = Packet::parse(&recv).unwrap();
 
     if let Packet::Up(Up::PushData(packet)) = packet {
         let mut buffer = [0; 512];
         let written = packet.serialize(&mut buffer).unwrap();
-        let _packet = Packet::parse(&buffer, written as usize).unwrap();
+        let _packet = Packet::parse(&buffer[..written as usize]).unwrap();
     } else {
         assert!(false);
     }
@@ -92,15 +92,15 @@ fn test_push_data_stat() {
         0x22, 0x3A, 0x30, 0x7D, 0x7D,
     ];
 
-    let packet = Packet::parse(&recv, recv.len()).unwrap();
+    let packet = Packet::parse(&recv).unwrap();
 
     if let Packet::Up(Up::PushData(packet)) = packet {
-        let _packet_first_read = Packet::parse(&recv, recv.len()).unwrap();
+        let _packet_first_read = Packet::parse(&recv).unwrap();
 
         let mut buffer_first = [0; 512];
         let written_first = packet.serialize(&mut buffer_first).unwrap();
 
-        let packet_second_read = Packet::parse(&buffer_first, written_first as usize).unwrap();
+        let packet_second_read = Packet::parse(&buffer_first[..written_first as usize]).unwrap();
         if let Packet::Up(Up::PushData(packet_second_read)) = packet_second_read {
             let mut buffer_second = [0; 512];
             let _written_second = packet_second_read.serialize(&mut buffer_second).unwrap();
