@@ -34,8 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let buffer = [1, 2, 3, 4];
                     let size = buffer.len() as u64;
                     let data = base64::encode(buffer);
-                    let tmst =
-                        StringOrNum::N(rxpk.get_timestamp() + 1_000_000);
+                    let tmst = StringOrNum::N(rxpk.get_timestamp() + 1_000_000);
 
                     let txpk = pull_resp::TxPk {
                         imme: false,
@@ -55,19 +54,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         ncrc: None,
                     };
 
-                    let prepared_send =
-                        udp_runtime.prepare_downlink(txpk, gateway_mac);
+                    let prepared_send = udp_runtime.prepare_downlink(txpk, gateway_mac);
 
                     tokio::spawn(async move {
-                        if let Err(e) =
-                            prepared_send.dispatch(Some(Duration::from_secs(5))).await
-                        {
+                        if let Err(e) = prepared_send.dispatch(Some(Duration::from_secs(5))).await {
                             panic!("Transmit Dispatch threw error: {:?}", e)
                         } else {
                             println!("Send complete");
                         }
                     });
-                },
+                }
                 Event::NoClientWithMac(_packet, mac) => {
                     println!("Tried to send to client with unknown MAC: {:?}", mac)
                 }

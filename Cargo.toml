@@ -13,6 +13,10 @@ name = "server"
 required-features = ["server"]
 
 [[example]]
+name = "server_split"
+required-features = ["server"]
+
+[[example]]
 name = "client"
 required-features = ["client"]
 
