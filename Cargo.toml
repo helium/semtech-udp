@@ -25,6 +25,7 @@ num_enum = "0.4"
 arrayref = "0.3"
 serde_json = { version = "1.0" }
 serde = { version = "1.0.100", default-features = false,  features = ["derive"] }
+serde_repr = "0.1"
 rand = "0.7.3"
 
 [dev-dependencies]

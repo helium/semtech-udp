@@ -13,9 +13,11 @@ Bytes  | Function
 12-end | JSON object, starting with {, ending with }, see section 4
  */
 use super::{
-    push_ack, write_preamble, Error as PktError, Identifier, MacAddress, SerializablePacket,
+    push_ack, write_preamble, CodingRate, DataRate, Error as PktError, Identifier, MacAddress,
+    Modulation, SerializablePacket,
 };
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::io::{Cursor, Write};
 
 #[derive(Debug, Clone)]
@@ -41,16 +43,16 @@ impl Packet {
     pub fn random() -> Packet {
         let rxpk = vec![RxPk::V1(RxPkV1 {
             chan: 0,
-            codr: "4/5".to_string(),
+            codr: CodingRate::_4_5,
             data: "AA=".to_string(),
-            datr: "SF8BW500".to_string(),
+            datr: DataRate::default(),
             freq: 902.800_000,
             lsnr: -15.0,
-            modu: "Foo".to_string(),
+            modu: Modulation::LORA,
             rfch: 0,
             rssi: -80,
             size: 12,
-            stat: 12,
+            stat: CRC::OK,
             tmst: 12,
         })];
 
@@ -95,17 +97,25 @@ data | string | Base64 encoded RF packet payload, padded
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RxPkV1 {
     pub chan: u64,
-    pub codr: String,
+    pub codr: CodingRate,
     pub data: String,
-    pub datr: String,
+    pub datr: DataRate,
     pub freq: f64,
     pub lsnr: f32,
-    pub modu: String,
+    pub modu: Modulation,
     pub rfch: u64,
     pub rssi: i32,
     pub size: u64,
-    pub stat: u64,
+    pub stat: CRC,
     pub tmst: u64,
+}
+
+#[derive(Debug, Serialize_repr, Deserialize_repr, Clone)]
+#[repr(i8)]
+pub enum CRC {
+    Disabled = 0,
+    OK = 1,
+    Fail = -1,
 }
 
 /*
@@ -130,20 +140,19 @@ codr    | string | LoRa ECC coding rate identifier
 size    | number | RF packet payload size in bytes (unsigned integer)
 data    | string | Base64 encoded RF packet payload, padded
  */
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RxPkV2 {
     pub aesk: usize,
     pub brd: usize,
-    pub codr: String,
+    pub codr: CodingRate,
     pub data: String,
-    pub datr: String,
+    pub datr: DataRate,
     pub freq: f64,
     pub jver: usize,
     pub modu: String,
     pub rsig: Vec<RSig>,
     pub size: u64,
-    pub stat: u64,
+    pub stat: CRC,
     pub tmst: u64,
     pub delayed: Option<bool>,
     pub tmms: Option<u64>,
@@ -226,7 +235,7 @@ impl RxPk {
         get_field!(self, tmst)
     }
 
-    pub fn get_datarate(&self) -> String {
+    pub fn get_datarate(&self) -> DataRate {
         get_field!(self, datr).clone()
     }
 }

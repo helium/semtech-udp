@@ -1,6 +1,10 @@
 use num_enum::TryFromPrimitive;
+use serde::{Deserialize, Serialize};
 use std::error::Error as stdError;
 use std::fmt;
+
+mod types;
+pub use types::*;
 
 const PROTOCOL_VERSION: u8 = 2;
 
@@ -32,7 +36,6 @@ pub enum Identifier {
     PullAck = 4,
     TxAck = 5,
 }
-use serde::{Deserialize, Serialize};
 
 pub mod pull_ack;
 pub mod pull_data;
