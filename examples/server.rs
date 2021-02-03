@@ -1,8 +1,7 @@
 use semtech_udp::{
     pull_resp,
     server_runtime::{Event, UdpRuntime},
-    StringOrNum,
-    CodingRate,
+    CodingRate, DataRate, Modulation, StringOrNum,
 };
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -42,8 +41,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     freq: 902.800_000,
                     rfch: 0,
                     powe: 27,
-                    modu: "LORA".to_string(),
-                    datr: "SF8BW500".to_string(),
+                    modu: Modulation::LORA,
+                    datr: DataRate::default(),
                     codr: CodingRate::_4_5,
                     ipol: true,
                     size,

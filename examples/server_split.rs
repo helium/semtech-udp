@@ -1,7 +1,7 @@
 use semtech_udp::{
     pull_resp,
     server_runtime::{Event, UdpRuntime},
-    MacAddress, StringOrNum, CodingRate
+    Bandwidth, CodingRate, DataRate, MacAddress, Modulation, SpreadingFactor, StringOrNum,
 };
 use std::net::SocketAddr;
 use structopt::StructOpt;
@@ -39,8 +39,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 freq: cli.frequency,
                 rfch: 0,
                 powe: cli.power as u64,
-                modu: "LORA".to_string(),
-                datr: cli.data_rate.clone(),
+                modu: Modulation::LORA,
+                datr: DataRate::new(cli.spreading_factor.clone(), cli.bandwidth.clone()),
                 codr: CodingRate::_4_5,
                 ipol: cli.polarization_inversion,
                 size,
@@ -121,9 +121,13 @@ pub struct Opt {
     #[structopt(long, default_value = "868.1")]
     frequency: f64,
 
-    /// Data rate (Spreading Factor / Bandwidth)
-    #[structopt(long, default_value = "SF12BW125")]
-    data_rate: String,
+    /// Spreading Factor (eg: SF12)
+    #[structopt(long, default_value = "SF12")]
+    spreading_factor: SpreadingFactor,
+
+    /// Bandwdith (eg: BW125)
+    #[structopt(long, default_value = "BW125")]
+    bandwidth: Bandwidth,
 
     /// Polarization inversion (set true when sending to devices)
     #[structopt(long)]

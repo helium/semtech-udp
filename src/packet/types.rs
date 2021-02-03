@@ -5,6 +5,7 @@ pub use data_rate::*;
 pub mod data_rate {
     use serde::de::IntoDeserializer;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::str::FromStr;
 
     #[derive(Debug, Clone, Default)]
     pub struct DataRate {
@@ -12,6 +13,14 @@ pub mod data_rate {
         pub bandwidth: Bandwidth,
     }
 
+    impl DataRate {
+        pub fn new(spreading_factor: SpreadingFactor, bandwidth: Bandwidth) -> DataRate {
+            DataRate {
+                spreading_factor,
+                bandwidth,
+            }
+        }
+    }
     impl Serialize for DataRate {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
@@ -53,6 +62,22 @@ pub mod data_rate {
         SF12,
     }
 
+    impl FromStr for SpreadingFactor {
+        type Err = ParseError;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "SF7" => Ok(SpreadingFactor::SF7),
+                "SF8" => Ok(SpreadingFactor::SF8),
+                "SF9" => Ok(SpreadingFactor::SF9),
+                "SF10" => Ok(SpreadingFactor::SF10),
+                "SF11" => Ok(SpreadingFactor::SF11),
+                "SF12" => Ok(SpreadingFactor::SF12),
+                _ => Err(ParseError::InvalidSpreadingFactor),
+            }
+        }
+    }
+
     impl Default for SpreadingFactor {
         fn default() -> Self {
             SpreadingFactor::SF7
@@ -66,9 +91,37 @@ pub mod data_rate {
         BW500,
     }
 
+    impl FromStr for Bandwidth {
+        type Err = ParseError;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "BW125" => Ok(Bandwidth::BW125),
+                "BW250" => Ok(Bandwidth::BW250),
+                "BW500" => Ok(Bandwidth::BW500),
+                _ => Err(ParseError::InvalidBandwidth),
+            }
+        }
+    }
+
     impl Default for Bandwidth {
         fn default() -> Self {
             Bandwidth::BW250
+        }
+    }
+
+    #[derive(Debug)]
+    pub enum ParseError {
+        InvalidSpreadingFactor,
+        InvalidBandwidth,
+    }
+    impl std::fmt::Display for ParseError {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            let msg = match self {
+                ParseError::InvalidSpreadingFactor => "Invalid spreading factor input",
+                ParseError::InvalidBandwidth => "Invalid bandwidth input",
+            };
+            write!(f, "{}", msg)
         }
     }
 }
