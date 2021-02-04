@@ -117,7 +117,7 @@ use crate::packet::StringOrNum;
 #[test]
 fn test_immediate_send() {
     use crate::packet::pull_resp::TxPk;
-    let json = "{\"codr\":\"4/5\",\"data\":\"QDDaAAHUbYkmAGY3AFAvfpbHJeCeuDu3xbCCHeg7YPOUJOfBCSc4Y3LtT4aToTGl9AYK4+NiALvTgey0M4ZJzh43vLaaXzFHko0jlb0CVeNgAtbTsAttQ\",\"datr\":\"SF10BW125\",\"freq\":904.1,\"imme\":true,\"ipol\":false,\"modu\":\"LORA\",\"powe\":27,\"rfch\":0,\"size\":87,\"tmst\":\"immediate\"}";
+    let json = "{\"codr\":\"4/5\",\"data\":\"IHLF2EA+n8BFY1vrCU1k/Vg=\",\"datr\":\"SF10BW125\",\"freq\":904.1,\"imme\":true,\"ipol\":false,\"modu\":\"LORA\",\"powe\":27,\"rfch\":0,\"size\":87,\"tmst\":\"immediate\"}";
 
     let txpk: TxPk = serde_json::from_str(json).unwrap();
     if let StringOrNum::S(_) = txpk.tmst {
@@ -144,7 +144,7 @@ fn new_packet() {
     let rxpk = push_data::RxPkV1 {
         chan: 0,
         codr: CodingRate::_4_5,
-        data: "AA=".to_string(),
+        data: vec![0, 0],
         datr: DataRate::default(),
         freq: 902.800_000,
         lsnr: -15.0,

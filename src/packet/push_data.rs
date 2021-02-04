@@ -44,7 +44,7 @@ impl Packet {
         let rxpk = vec![RxPk::V1(RxPkV1 {
             chan: 0,
             codr: CodingRate::_4_5,
-            data: "AA=".to_string(),
+            data: vec![0, 0],
             datr: DataRate::default(),
             freq: 902.800_000,
             lsnr: -15.0,
@@ -98,7 +98,8 @@ data | string | Base64 encoded RF packet payload, padded
 pub struct RxPkV1 {
     pub chan: u64,
     pub codr: CodingRate,
-    pub data: String,
+    #[serde(with = "crate::packet::types::base64")]
+    pub data: Vec<u8>,
     pub datr: DataRate,
     pub freq: f64,
     pub lsnr: f32,
@@ -145,7 +146,8 @@ pub struct RxPkV2 {
     pub aesk: usize,
     pub brd: usize,
     pub codr: CodingRate,
-    pub data: String,
+    #[serde(with = "crate::packet::types::base64")]
+    pub data: Vec<u8>,
     pub datr: DataRate,
     pub freq: f64,
     pub jver: usize,
@@ -227,8 +229,8 @@ impl RxPk {
         get_field!(self, freq)
     }
 
-    pub fn get_data(&self) -> String {
-        get_field!(self, data).clone()
+    pub fn get_data(&self) -> &Vec<u8> {
+        get_field!(self, data)
     }
 
     pub fn get_timestamp(&self) -> &u64 {

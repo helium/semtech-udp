@@ -104,7 +104,8 @@ pub struct TxPk {
     pub ipol: bool,       // Lora modulation polarization inversion
     pub prea: Option<u64>, // RF preamble size (unsigned integer)
     pub size: u64,        // RF packet payload size in bytes (unsigned integer)
-    pub data: String,     // Base64 encoded RF packet payload, padding optional
+    #[serde(with = "crate::packet::types::base64")]
+    pub data: Vec<u8>, // Base64 encoded RF packet payload, padding optional
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ncrc: Option<bool>, // If true, disable the CRC of the physical layer (optional)
 }
