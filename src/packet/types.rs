@@ -4,10 +4,10 @@ pub use data_rate::*;
 
 pub mod data_rate {
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+    use std::cmp::PartialEq;
     use std::str::FromStr;
     use std::string::ToString;
-
-    #[derive(Debug, Clone, Default)]
+    #[derive(Debug, Clone, Default, PartialEq)]
     pub struct DataRate(SpreadingFactor, Bandwidth);
 
     impl DataRate {
@@ -146,6 +146,36 @@ pub mod data_rate {
                 ParseError::InvalidBandwidth => "Invalid bandwidth input",
             };
             write!(f, "{}", msg)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        // Note this useful idiom: importing names from outer (for mod tests) scope.
+        use super::*;
+
+        #[test]
+        fn test_to_string_sf7() {
+            let datarate = DataRate(SpreadingFactor::SF7, Bandwidth::BW500);
+            assert_eq!(datarate.to_string(), "SF7BW500")
+        }
+
+        #[test]
+        fn test_to_string_sf10() {
+            let datarate = DataRate(SpreadingFactor::SF10, Bandwidth::BW125);
+            assert_eq!(datarate.to_string(), "SF10BW125")
+        }
+
+        #[test]
+        fn test_from_str_sf10() {
+            let datarate = DataRate::from_str("SF10BW125").unwrap();
+            assert_eq!(datarate, DataRate(SpreadingFactor::SF10, Bandwidth::BW125))
+        }
+
+        #[test]
+        fn test_from_str_sf7() {
+            let datarate = DataRate::from_str("SF7BW500").unwrap();
+            assert_eq!(datarate, DataRate(SpreadingFactor::SF7, Bandwidth::BW500))
         }
     }
 }
