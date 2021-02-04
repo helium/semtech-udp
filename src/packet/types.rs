@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 pub use data_rate::*;
 
 pub mod data_rate {
-    use serde::de::IntoDeserializer;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
     use std::str::FromStr;
+    use std::string::ToString;
 
     #[derive(Debug, Clone, Default)]
     pub struct DataRate {
@@ -21,14 +21,37 @@ pub mod data_rate {
             }
         }
     }
+
+    impl FromStr for DataRate {
+        type Err = ParseError;
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let (spreading, bandwidth) = if s.len() > 8 {
+                (&s[..4], &s[4..])
+            } else {
+                (&s[..3], &s[3..])
+            };
+
+            Ok(DataRate {
+                bandwidth: Bandwidth::from_str(bandwidth)?,
+                spreading_factor: SpreadingFactor::from_str(spreading)?,
+            })
+        }
+    }
+
+    impl ToString for DataRate {
+        fn to_string(&self) -> String {
+            let mut output = self.spreading_factor.to_string();
+            output.push_str(&self.bandwidth.to_string());
+            output
+        }
+    }
+
     impl Serialize for DataRate {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
-            let mut str = String::new();
-            str.push_str(&format!("{:?}", self.spreading_factor));
-            str.push_str(&format!("{:?}", self.bandwidth));
+            let str = self.to_string();
             serializer.serialize_str(&str)
         }
     }
@@ -39,16 +62,7 @@ pub mod data_rate {
             D: Deserializer<'de>,
         {
             let s = <&str>::deserialize(deserializer)?;
-            let (sf_s, bw_s) = if s.len() > 8 {
-                (&s[..4], &s[4..])
-            } else {
-                (&s[..3], &s[3..])
-            };
-
-            Ok(DataRate {
-                bandwidth: Bandwidth::deserialize(bw_s.into_deserializer())?,
-                spreading_factor: SpreadingFactor::deserialize(sf_s.into_deserializer())?,
-            })
+            DataRate::from_str(&s).map_err(de::Error::custom)
         }
     }
 
@@ -64,7 +78,6 @@ pub mod data_rate {
 
     impl FromStr for SpreadingFactor {
         type Err = ParseError;
-
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             match s {
                 "SF7" => Ok(SpreadingFactor::SF7),
@@ -93,7 +106,6 @@ pub mod data_rate {
 
     impl FromStr for Bandwidth {
         type Err = ParseError;
-
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             match s {
                 "BW125" => Ok(Bandwidth::BW125),
@@ -101,6 +113,18 @@ pub mod data_rate {
                 "BW500" => Ok(Bandwidth::BW500),
                 _ => Err(ParseError::InvalidBandwidth),
             }
+        }
+    }
+
+    impl ToString for Bandwidth {
+        fn to_string(&self) -> String {
+            format!("{:?}", self)
+        }
+    }
+
+    impl ToString for SpreadingFactor {
+        fn to_string(&self) -> String {
+            format!("{:?}", self)
         }
     }
 

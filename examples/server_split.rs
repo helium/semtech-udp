@@ -28,9 +28,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut first_shot = true;
         while cli.delay != 0 || first_shot {
             first_shot = false;
-            let buffer = vec![0; cli.length];
-            let size = buffer.len() as u64;
-            let data = base64::encode(buffer);
+            let data = vec![0; cli.length];
+            let size = data.len() as u64;
             let tmst = StringOrNum::N(0);
 
             let txpk = pull_resp::TxPk {

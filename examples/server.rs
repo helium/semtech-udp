@@ -30,9 +30,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::PacketReceived(rxpk, gateway_mac) => {
                 println!("{:?}", rxpk);
 
-                let buffer = [1, 2, 3, 4];
-                let size = buffer.len() as u64;
-                let data = base64::encode(buffer);
+                let data = vec![1, 2, 3, 4];
+                let size = data.len() as u64;
                 let tmst = StringOrNum::N(rxpk.get_timestamp() + 1_000_000);
 
                 let txpk = pull_resp::TxPk {

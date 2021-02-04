@@ -141,23 +141,6 @@ fn test_timed_send() {
 
 #[test]
 fn new_packet() {
-    let rxpk = push_data::RxPkV1 {
-        chan: 0,
-        codr: CodingRate::_4_5,
-        data: vec![0, 0],
-        datr: DataRate::default(),
-        freq: 902.800_000,
-        lsnr: -15.0,
-        modu: Modulation::LORA,
-        rfch: 0,
-        rssi: -80,
-        size: 12,
-        stat: push_data::CRC::OK,
-        tmst: 12,
-    };
-
-    println!("{:?}", serde_json::to_string(&rxpk));
-
     let recv = [
         2, 159, 48, 0, 0, 128, 0, 0, 160, 0, 102, 31, 123, 34, 114, 120, 112, 107, 34, 58, 91, 123,
         34, 116, 109, 115, 116, 34, 58, 52, 50, 48, 50, 56, 55, 57, 48, 56, 52, 44, 34, 116, 105,
