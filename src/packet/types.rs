@@ -8,40 +8,40 @@ pub mod data_rate {
     use std::string::ToString;
 
     #[derive(Debug, Clone, Default)]
-    pub struct DataRate {
-        pub spreading_factor: SpreadingFactor,
-        pub bandwidth: Bandwidth,
-    }
+    pub struct DataRate(SpreadingFactor, Bandwidth);
 
     impl DataRate {
         pub fn new(spreading_factor: SpreadingFactor, bandwidth: Bandwidth) -> DataRate {
-            DataRate {
-                spreading_factor,
-                bandwidth,
-            }
+            DataRate(spreading_factor, bandwidth)
+        }
+        pub fn spreading_factor(&self) -> &SpreadingFactor {
+            &self.0
+        }
+        pub fn bandwidth(&self) -> &Bandwidth {
+            &self.1
         }
     }
 
     impl FromStr for DataRate {
         type Err = ParseError;
         fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let (spreading, bandwidth) = if s.len() > 8 {
+            let (sf, bw) = if s.len() > 8 {
                 (&s[..4], &s[4..])
             } else {
                 (&s[..3], &s[3..])
             };
 
-            Ok(DataRate {
-                bandwidth: Bandwidth::from_str(bandwidth)?,
-                spreading_factor: SpreadingFactor::from_str(spreading)?,
-            })
+            Ok(DataRate(
+                SpreadingFactor::from_str(sf)?,
+                Bandwidth::from_str(bw)?,
+            ))
         }
     }
 
     impl ToString for DataRate {
         fn to_string(&self) -> String {
-            let mut output = self.spreading_factor.to_string();
-            output.push_str(&self.bandwidth.to_string());
+            let mut output = self.spreading_factor().to_string();
+            output.push_str(&self.bandwidth().to_string());
             output
         }
     }
