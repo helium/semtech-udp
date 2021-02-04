@@ -2,13 +2,10 @@
 
 # Semtech UDP
 
-Semtech UDP provides serialization and deserialization of packets complying
-with the Semtech UDP protocol.
+Semtech UDP provides serialization and deserialization of packets complying with the Semtech GWMP over UDP protocol.
 
-The **server** feature provides a Tokio-based runtime which handles  all the
-UDP and Semtech UDP protocol details, such as ACKs and keeping track of client
-addresses. 
+The `server` feature provides a Tokio-based runtime which handles the UDP and Semtech GWMP UDP protocol details, such as
+ACKs and keeping track of client addresses. It exposes an async API for receiving all messages for the client and an 
+asynchronous send function which returns only when the transmit ack (tx_ack) is received.
 
-It exposes an async API for receiving all messages for the client
-and an asynchronous send function which returns only when the transmit ack is
-received.
+The `client` feature provides a Tokio-based runtime which handles the UDP and Semtech UDP protocol details, such as ACKs.
