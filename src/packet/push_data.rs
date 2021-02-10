@@ -209,30 +209,47 @@ macro_rules! get_field {
         }
     };
 }
+use std::cmp;
+
 impl RxPk {
     pub fn get_snr(&self) -> f32 {
         match self {
             RxPk::V1(pk) => pk.lsnr,
-            RxPk::V2(pk) => pk.rsig[0].lsnr,
+            RxPk::V2(pk) => pk
+                .rsig
+                .iter()
+                // truncate the decimal when choosing best LSNR value
+                .fold(-150.0, |max, x| {
+                    if (max as u32) < (x.lsnr as u32) {
+                        x.lsnr
+                    } else {
+                        max
+                    }
+                }),
         }
     }
 
-    pub fn get_rssi(&self) -> i32 {
+    pub fn get_channel_rssi(&self) -> i32 {
         match self {
-            RxPk::V1(pk) => {
-                if let Some(rssi) = pk.rssis {
-                    rssi
+            RxPk::V1(pk) => pk.rssi,
+            RxPk::V2(pk) => pk.rsig.iter().fold(-150, |max, x| cmp::max(max, x.rssic)),
+        }
+    }
+
+    pub fn get_signal_rssi(&self) -> Option<i32> {
+        match self {
+            RxPk::V1(pk) => pk.rssis,
+            RxPk::V2(pk) => pk.rsig.iter().fold(None, |max, x| {
+                if let Some(rssis) = x.rssis {
+                    Some(if let Some(current_max) = max {
+                        cmp::max(current_max, rssis)
+                    } else {
+                        rssis
+                    })
                 } else {
-                    pk.rssi
+                    max
                 }
-            }
-            RxPk::V2(pk) => {
-                if let Some(rssi) = pk.rsig[0].rssis {
-                    rssi
-                } else {
-                    pk.rsig[0].rssic
-                }
-            }
+            }),
         }
     }
 
