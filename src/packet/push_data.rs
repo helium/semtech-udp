@@ -51,6 +51,7 @@ impl Packet {
             modu: Modulation::LORA,
             rfch: 0,
             rssi: -80,
+            rssis: Some(-80),
             size: 12,
             stat: CRC::OK,
             tmst: 12,
@@ -106,6 +107,8 @@ pub struct RxPkV1 {
     pub modu: Modulation,
     pub rfch: u64,
     pub rssi: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rssis: Option<i32>,
     pub size: u64,
     pub stat: CRC,
     pub tmst: u64,
@@ -216,11 +219,19 @@ impl RxPk {
 
     pub fn get_rssi(&self) -> i32 {
         match self {
-            RxPk::V1(pk) => pk.rssi,
+            RxPk::V1(pk) => {
+                if let Some(rssi) = pk.rssis {
+                    rssi
+                } else {
+                    pk.rssi
+                }
+            }
             RxPk::V2(pk) => {
-                // erlang implementation spec packet_rssi(map()) -> number()
-                // takes rssic so we will too
-                pk.rsig[0].rssic
+                if let Some(rssi) = pk.rsig[0].rssis {
+                    rssi
+                } else {
+                    pk.rsig[0].rssic
+                }
             }
         }
     }
