@@ -128,12 +128,7 @@ impl ClientRx {
 }
 
 impl ClientTx {
-    pub async fn send(
-        &mut self,
-        txpk: TxPk,
-        mac: MacAddress,
-        timeout: Option<Duration>,
-    ) -> Result {
+    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress, timeout: Option<Duration>) -> Result {
         let prepared_send = self.prepare_downlink(Some(txpk), mac);
         prepared_send.dispatch(timeout).await
     }
@@ -170,12 +165,7 @@ impl UdpRuntime {
         (self.rx, self.tx)
     }
 
-    pub async fn send(
-        &mut self,
-        txpk: TxPk,
-        mac: MacAddress,
-        timeout: Option<Duration>,
-    ) -> Result {
+    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress, timeout: Option<Duration>) -> Result {
         self.tx.send(txpk, mac, timeout).await
     }
 
