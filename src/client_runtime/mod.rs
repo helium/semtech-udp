@@ -51,7 +51,7 @@ impl UdpRuntime {
         self.rx.sender.subscribe()
     }
 
-    pub async fn run(self) -> Result<()> {
+    pub async fn run(self) -> Result {
         let (rx, tx, poll_sender) = self.split();
 
         // udp_runtime_rx reads from the UDP port
@@ -115,7 +115,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 impl UdpRuntimeRx {
-    pub async fn run(self) -> Result<()> {
+    pub async fn run(self) -> Result {
         let mut buf = vec![0u8; 1024];
         loop {
             match self.socket_recv.recv(&mut buf).await {
@@ -153,7 +153,7 @@ impl UdpRuntimeRx {
 }
 
 impl UdpRuntimeTx {
-    pub async fn run(mut self) -> Result<()> {
+    pub async fn run(mut self) -> Result {
         let mut buf = vec![0u8; 1024];
         loop {
             let tx = self.receiver.recv().await;

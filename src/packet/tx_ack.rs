@@ -18,11 +18,7 @@ Bytes  | Function
 */
 use super::{write_preamble, Error as PktError, Identifier, MacAddress, SerializablePacket};
 use serde::{Deserialize, Serialize};
-use std::{
-    error::Error as stdError,
-    fmt,
-    io::{Cursor, Write},
-};
+use std::io::{Cursor, Write};
 
 #[derive(Debug, Clone)]
 pub struct Packet {
@@ -46,7 +42,7 @@ impl Packet {
 }
 
 impl SerializablePacket for Packet {
-    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, PktError> {
+    fn serialize(&self, buffer: &mut [u8]) -> Result<u64, PktError> {
         let mut w = Cursor::new(buffer);
         write_preamble(&mut w, self.random_token)?;
         w.write_all(&[Identifier::TxAck as u8])?;
@@ -85,42 +81,31 @@ impl From<Packet> for super::Packet {
 // }}
 // ```
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+use thiserror::Error;
+
+#[derive(Error, Debug, Serialize, Deserialize, Clone, Copy)]
 #[allow(non_camel_case_types)]
 pub enum Error {
+    #[error("TxAck::Error::NONE")]
     NONE,
+    #[error("TxAck::Error::TOO_LATE")]
     TOO_LATE,
+    #[error("TxAck::Error::TOO_EARLY")]
     TOO_EARLY,
+    #[error("TxAck::Error::COLLISION_PACKET")]
     COLLISION_PACKET,
+    #[error("TxAck::Error::COLLISION_BEACON")]
     COLLISION_BEACON,
+    #[error("TxAck::Error::TX_FREQ")]
     TX_FREQ,
+    #[error("TxAck::Error::TX_POWER")]
     TX_POWER,
+    #[error("TxAck::Error::GPS_UNLOCKED")]
     GPS_UNLOCKED,
+    #[error("TxAck::Error::SEND_LBT")]
     SEND_LBT,
+    #[error("TxAck::Error::SEND_FAIL")]
     SEND_FAIL,
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::NONE => write!(f, "TxAck::Error::NONE"),
-            Error::TOO_LATE => write!(f, "TxAck::Error::TOO_LATE"),
-            Error::TOO_EARLY => write!(f, "TxAck::Error::TOO_EARLY"),
-            Error::COLLISION_PACKET => write!(f, "TxAck::Error::COLLISION_PACKET"),
-            Error::COLLISION_BEACON => write!(f, "TxAck::Error::COLLISION_BEACON"),
-            Error::TX_FREQ => write!(f, "TxAck::Error::TX_FREQ, Transmit frequency is rejected"),
-            Error::TX_POWER => write!(f, "TxAck::Error::TX_POWER"),
-            Error::GPS_UNLOCKED => write!(f, "TxAck::Error::GPS_UNLOCKED"),
-            Error::SEND_LBT => write!(f, "TxAck::Error::SEND_LBT"),
-            Error::SEND_FAIL => write!(f, "TxAck::Error::SEND_FAIL"),
-        }
-    }
-}
-
-impl stdError for Error {
-    fn source(&self) -> Option<&(dyn stdError + 'static)> {
-        Some(self)
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

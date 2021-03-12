@@ -90,7 +90,7 @@ impl Downlink {
         });
     }
 
-    async fn just_dispatch(self) -> Result<()> {
+    async fn just_dispatch(self) -> Result {
         if let Some(packet) = self.packet {
             let (sender, receiver) = oneshot::channel();
 
@@ -110,7 +110,7 @@ impl Downlink {
         }
     }
 
-    pub async fn dispatch(self, timeout_duration: Option<Duration>) -> Result<()> {
+    pub async fn dispatch(self, timeout_duration: Option<Duration>) -> Result {
         if let Some(duration) = timeout_duration {
             timeout(duration, self.just_dispatch()).await?
         } else {
@@ -133,7 +133,7 @@ impl ClientTx {
         txpk: TxPk,
         mac: MacAddress,
         timeout: Option<Duration>,
-    ) -> Result<()> {
+    ) -> Result {
         let prepared_send = self.prepare_downlink(Some(txpk), mac);
         prepared_send.dispatch(timeout).await
     }
@@ -175,7 +175,7 @@ impl UdpRuntime {
         txpk: TxPk,
         mac: MacAddress,
         timeout: Option<Duration>,
-    ) -> Result<()> {
+    ) -> Result {
         self.tx.send(txpk, mac, timeout).await
     }
 
@@ -249,7 +249,7 @@ impl UdpRuntime {
 }
 
 impl UdpRx {
-    pub async fn run(self) -> Result<()> {
+    pub async fn run(self) -> Result {
         let mut buf = vec![0u8; 1024];
         loop {
             match self.socket_receiver.recv_from(&mut buf).await {
@@ -334,7 +334,7 @@ impl UdpRx {
 }
 
 impl Internal {
-    pub async fn run(mut self) -> Result<()> {
+    pub async fn run(mut self) -> Result {
         let mut buf = vec![0u8; 1024];
         loop {
             let msg = self.receiver.recv().await;

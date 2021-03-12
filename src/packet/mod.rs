@@ -110,7 +110,7 @@ impl fmt::Display for MacAddress {
 
 use std::io::{Cursor, Write};
 
-fn write_preamble(w: &mut Cursor<&mut [u8]>, token: u16) -> Result<()> {
+fn write_preamble(w: &mut Cursor<&mut [u8]>, token: u16) -> Result {
     Ok(w.write_all(&[PROTOCOL_VERSION, (token >> 8) as u8, token as u8])?)
 }
 
@@ -122,7 +122,7 @@ pub enum StringOrNum {
 }
 
 pub trait SerializablePacket {
-    fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, Error>;
+    fn serialize(&self, buffer: &mut [u8]) -> Result<u64>;
 }
 
 #[macro_export]
