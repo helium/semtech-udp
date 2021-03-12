@@ -51,6 +51,7 @@ impl Packet {
             modu: Modulation::LORA,
             rfch: 0,
             rssi: -80,
+            rssis: Some(-80),
             size: 12,
             stat: CRC::OK,
             tmst: 12,
@@ -106,6 +107,8 @@ pub struct RxPkV1 {
     pub modu: Modulation,
     pub rfch: u64,
     pub rssi: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rssis: Option<i32>,
     pub size: u64,
     pub stat: CRC,
     pub tmst: u64,
@@ -206,22 +209,47 @@ macro_rules! get_field {
         }
     };
 }
+use std::cmp;
+
 impl RxPk {
     pub fn get_snr(&self) -> f32 {
         match self {
             RxPk::V1(pk) => pk.lsnr,
-            RxPk::V2(pk) => pk.rsig[0].lsnr,
+            RxPk::V2(pk) => pk
+                .rsig
+                .iter()
+                // truncate the decimal when choosing best LSNR value
+                .fold(-150.0, |max, x| {
+                    if (max as u32) < (x.lsnr as u32) {
+                        x.lsnr
+                    } else {
+                        max
+                    }
+                }),
         }
     }
 
-    pub fn get_rssi(&self) -> i32 {
+    pub fn get_channel_rssi(&self) -> i32 {
         match self {
             RxPk::V1(pk) => pk.rssi,
-            RxPk::V2(pk) => {
-                // erlang implementation spec packet_rssi(map()) -> number()
-                // takes rssic so we will too
-                pk.rsig[0].rssic
-            }
+            RxPk::V2(pk) => pk.rsig.iter().fold(-150, |max, x| cmp::max(max, x.rssic)),
+        }
+    }
+
+    pub fn get_signal_rssi(&self) -> Option<i32> {
+        match self {
+            RxPk::V1(pk) => pk.rssis,
+            RxPk::V2(pk) => pk.rsig.iter().fold(None, |max, x| {
+                if let Some(rssis) = x.rssis {
+                    Some(if let Some(current_max) = max {
+                        cmp::max(current_max, rssis)
+                    } else {
+                        rssis
+                    })
+                } else {
+                    max
+                }
+            }),
         }
     }
 
