@@ -2,12 +2,10 @@ use super::{
     parser::Parser, pull_resp, pull_resp::TxPk, tx_ack::Packet as TxAck, MacAddress, Packet,
     SerializablePacket, Up,
 };
+use std::sync::Arc;
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tokio::{
-    net::{
-        udp::{RecvHalf, SendHalf},
-        UdpSocket,
-    },
+    net::UdpSocket,
     sync::{mpsc, oneshot},
     time::timeout,
 };
@@ -37,7 +35,7 @@ pub enum Event {
 
 // receives requests from clients
 // dispatches them to UdpTx
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ClientTx {
     sender: mpsc::Sender<InternalEvent>,
     // you need to subscribe to the send channel
@@ -52,7 +50,7 @@ pub struct ClientRx {
 
 // receives and parses UDP packets
 struct UdpRx {
-    socket_receiver: RecvHalf,
+    socket_receiver: Arc<UdpSocket>,
     internal_sender: mpsc::Sender<InternalEvent>,
 }
 
@@ -62,7 +60,7 @@ struct Internal {
     client_tx_sender: mpsc::Sender<Event>,
     clients: HashMap<MacAddress, SocketAddr>,
     downlink_senders: HashMap<u16, oneshot::Sender<TxAck>>,
-    socket_sender: SendHalf,
+    socket_sender: Arc<UdpSocket>,
 }
 
 #[derive(Debug)]
@@ -103,7 +101,7 @@ impl Downlink {
         });
     }
 
-    async fn just_dispatch(mut self) -> Result<(), Error> {
+    async fn just_dispatch(self) -> Result<(), Error> {
         if let Some(packet) = self.packet {
             let (sender, receiver) = oneshot::channel();
 
@@ -206,7 +204,8 @@ impl UdpRuntime {
 
     pub async fn new(addr: SocketAddr) -> Result<UdpRuntime, Error> {
         let socket = UdpSocket::bind(&addr).await?;
-        let (socket_receiver, socket_sender) = socket.split();
+        let socket_receiver = Arc::new(socket);
+        let socket_sender = socket_receiver.clone();
 
         let (udp_tx_sender, udp_tx_receiver) = mpsc::channel(100);
         let (client_tx_sender, client_tx_receiver) = mpsc::channel(100);
@@ -261,7 +260,7 @@ impl UdpRuntime {
 }
 
 impl UdpRx {
-    pub async fn run(mut self) -> Result<(), Error> {
+    pub async fn run(self) -> Result<(), Error> {
         let mut buf = vec![0u8; 1024];
         loop {
             match self.socket_receiver.recv_from(&mut buf).await {
@@ -425,8 +424,8 @@ impl Internal {
     }
 }
 
-impl From<tokio::time::Elapsed> for Error {
-    fn from(_err: tokio::time::Elapsed) -> Error {
+impl From<tokio::time::error::Elapsed> for Error {
+    fn from(_err: tokio::time::error::Elapsed) -> Error {
         Error::SendTimeout
     }
 }

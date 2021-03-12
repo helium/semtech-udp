@@ -6,7 +6,7 @@ use semtech_udp::{
 use std::net::SocketAddr;
 use structopt::StructOpt;
 use tokio::sync::oneshot::{self, Receiver, Sender};
-use tokio::time::{delay_for as sleep, Duration};
+use tokio::time::{sleep, Duration};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -92,7 +92,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::NoClientWithMac(_packet, mac) => {
                 println!("Tried to send to client with unknown MAC: {:?}", mac)
             }
-            Event::RawPacket(_) => (),
+            Event::RawPacket(raw) => {
+                println!("Raw {:?}", raw)
+            }
         }
     }
 }
