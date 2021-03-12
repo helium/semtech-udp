@@ -105,7 +105,7 @@ pub struct TxPk {
     pub prea: Option<u64>, // RF preamble size (unsigned integer)
     pub size: u64,        // RF packet payload size in bytes (unsigned integer)
     #[serde(with = "crate::packet::types::base64")]
-    pub data: Vec<u8>, // Base64 encoded RF packet payload, padding optional
+    pub data: Vec<u8>, // Data to be transmitted, as bytes
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ncrc: Option<bool>, // If true, disable the CRC of the physical layer (optional)
 }
