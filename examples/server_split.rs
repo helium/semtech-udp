@@ -6,7 +6,7 @@ use semtech_udp::{
 use std::net::SocketAddr;
 use structopt::StructOpt;
 use tokio::sync::oneshot::{self, Receiver, Sender};
-use tokio::time::{delay_for as sleep, Duration};
+use tokio::time::{sleep, Duration};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

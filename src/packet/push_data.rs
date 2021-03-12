@@ -111,7 +111,7 @@ pub struct RxPkV1 {
     pub tmst: u64,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr, Clone)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Clone, PartialEq)]
 #[repr(i8)]
 pub enum CRC {
     Disabled = 0,
@@ -239,6 +239,10 @@ impl RxPk {
 
     pub fn get_datarate(&self) -> DataRate {
         get_field!(self, datr).clone()
+    }
+
+    pub fn get_crc_status(&self) -> &CRC {
+        get_field!(self, stat)
     }
 }
 
