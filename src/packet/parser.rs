@@ -14,17 +14,17 @@ pub fn gateway_mac(buffer: &[u8]) -> MacAddress {
 }
 
 pub trait Parser {
-    fn parse(buffer: &[u8]) -> std::result::Result<Packet, Error>;
+    fn parse(buffer: &[u8]) -> std::result::Result<Packet, ParseError>;
 }
 
 impl Parser for Packet {
-    fn parse(buffer: &[u8]) -> std::result::Result<Packet, Error> {
+    fn parse(buffer: &[u8]) -> std::result::Result<Packet, ParseError> {
         if buffer[PROTOCOL_VERSION_INDEX] != PROTOCOL_VERSION {
-            return Err(Error::InvalidProtocolVersion);
+            return Err(ParseError::InvalidProtocolVersion);
         };
 
         match Identifier::try_from(buffer[IDENTIFIER_INDEX]) {
-            Err(_) => Err(Error::InvalidIdentifier),
+            Err(_) => Err(ParseError::InvalidIdentifier),
             Ok(id) => {
                 let random_token = random_token(buffer);
                 let buffer = &buffer[4..];
@@ -77,58 +77,5 @@ impl Parser for Packet {
                 })
             }
         }
-    }
-}
-
-use std::{fmt, str};
-
-#[derive(Debug, Clone)]
-pub enum Error {
-    InvalidProtocolVersion,
-    InvalidIdentifier,
-    Utf8(std::str::Utf8Error),
-    Json,
-}
-
-impl From<std::str::Utf8Error> for Error {
-    fn from(err: std::str::Utf8Error) -> Error {
-        Error::Utf8(err)
-    }
-}
-
-impl From<serde_json::error::Error> for Error {
-    fn from(_: serde_json::error::Error) -> Error {
-        Error::Json
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Error::InvalidProtocolVersion => {
-                write!(f, "Invalid protocol version (byte 0 in UDP frame)")
-            }
-            Error::InvalidIdentifier => {
-                write!(f, "Invalid message identifier (byte 3 in UDP frame)")
-            }
-            Error::Utf8(err) => write!(f, "UTF-8 from bytes parsing error: {}", err),
-            Error::Json => write!(f, "Json Deserialization Error"),
-        }
-    }
-}
-
-impl stdError for Error {
-    fn description(&self) -> &str {
-        match self {
-            Error::InvalidProtocolVersion => "Invalid protocol version (byte 0 in UDP frame)",
-            Error::InvalidIdentifier => "Invalid message identifier (byte 3 in UDP frame)",
-            Error::Utf8(_err) => "UTF-8 from bytes parsing error",
-            Error::Json => "Json Deserialization Error",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn stdError> {
-        // Generic error, underlying cause isn't tracked.
-        None
     }
 }

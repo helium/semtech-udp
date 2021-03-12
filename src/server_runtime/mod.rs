@@ -12,6 +12,10 @@ use tokio::{
 
 pub use crate::push_data::RxPk;
 
+mod error;
+pub use error::Error;
+pub type Result<T = ()> = std::result::Result<T, Error>;
+
 #[derive(Debug)]
 enum InternalEvent {
     Downlink((pull_resp::Packet, MacAddress, oneshot::Sender<TxAck>)),
@@ -70,21 +74,6 @@ pub struct UdpRuntime {
 }
 use rand::Rng;
 
-#[derive(Debug)]
-pub enum Error {
-    AckChannelRecv(mpsc::error::RecvError),
-    AckError(super::packet::tx_ack::Error),
-    SendTimeout,
-    DispatchWithNoSendPacket,
-    UnknownMac,
-    UdpError(std::io::Error),
-    ClientEventQueueFull(Box<mpsc::error::SendError<Event>>),
-    InternalQueueClosedOrFull,
-    SemtechUdpSerialization(super::packet::Error),
-    AckRecvError,
-    ErrorSendingAck,
-}
-
 #[derive(Clone)]
 pub struct Downlink {
     random_token: u16,
@@ -101,7 +90,7 @@ impl Downlink {
         });
     }
 
-    async fn just_dispatch(self) -> Result<(), Error> {
+    async fn just_dispatch(self) -> Result {
         if let Some(packet) = self.packet {
             let (sender, receiver) = oneshot::channel();
 
@@ -121,7 +110,7 @@ impl Downlink {
         }
     }
 
-    pub async fn dispatch(self, timeout_duration: Option<Duration>) -> Result<(), Error> {
+    pub async fn dispatch(self, timeout_duration: Option<Duration>) -> Result {
         if let Some(duration) = timeout_duration {
             timeout(duration, self.just_dispatch()).await?
         } else {
@@ -139,12 +128,7 @@ impl ClientRx {
 }
 
 impl ClientTx {
-    pub async fn send(
-        &mut self,
-        txpk: TxPk,
-        mac: MacAddress,
-        timeout: Option<Duration>,
-    ) -> Result<(), Error> {
+    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress, timeout: Option<Duration>) -> Result {
         let prepared_send = self.prepare_downlink(Some(txpk), mac);
         prepared_send.dispatch(timeout).await
     }
@@ -181,12 +165,7 @@ impl UdpRuntime {
         (self.rx, self.tx)
     }
 
-    pub async fn send(
-        &mut self,
-        txpk: TxPk,
-        mac: MacAddress,
-        timeout: Option<Duration>,
-    ) -> Result<(), Error> {
+    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress, timeout: Option<Duration>) -> Result {
         self.tx.send(txpk, mac, timeout).await
     }
 
@@ -202,7 +181,7 @@ impl UdpRuntime {
         self.rx.recv().await
     }
 
-    pub async fn new(addr: SocketAddr) -> Result<UdpRuntime, Error> {
+    pub async fn new(addr: SocketAddr) -> Result<UdpRuntime> {
         let socket = UdpSocket::bind(&addr).await?;
         let socket_receiver = Arc::new(socket);
         let socket_sender = socket_receiver.clone();
@@ -260,7 +239,7 @@ impl UdpRuntime {
 }
 
 impl UdpRx {
-    pub async fn run(self) -> Result<(), Error> {
+    pub async fn run(self) -> Result {
         let mut buf = vec![0u8; 1024];
         loop {
             match self.socket_receiver.recv_from(&mut buf).await {
@@ -345,7 +324,7 @@ impl UdpRx {
 }
 
 impl Internal {
-    pub async fn run(mut self) -> Result<(), Error> {
+    pub async fn run(mut self) -> Result {
         let mut buf = vec![0u8; 1024];
         loop {
             let msg = self.receiver.recv().await;
@@ -388,7 +367,7 @@ impl Internal {
                     }
                     InternalEvent::AckReceived(txack) => {
                         if let Some(sender) = self.downlink_senders.remove(&txack.random_token) {
-                            sender.send(txack).map_err(|_| Error::ErrorSendingAck)?;
+                            sender.send(txack).map_err(|_| Error::AckSend)?;
                         } else {
                             eprintln!("ACK received for unknown random_token")
                         }
@@ -420,97 +399,6 @@ impl Internal {
                     }
                 }
             }
-        }
-    }
-}
-
-impl From<tokio::time::error::Elapsed> for Error {
-    fn from(_err: tokio::time::error::Elapsed) -> Error {
-        Error::SendTimeout
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Error {
-        Error::UdpError(err)
-    }
-}
-
-impl From<mpsc::error::SendError<Event>> for Error {
-    fn from(err: mpsc::error::SendError<Event>) -> Error {
-        Error::ClientEventQueueFull(err.into())
-    }
-}
-
-impl From<mpsc::error::SendError<InternalEvent>> for Error {
-    fn from(_err: mpsc::error::SendError<InternalEvent>) -> Error {
-        Error::InternalQueueClosedOrFull
-    }
-}
-
-impl From<super::packet::Error> for Error {
-    fn from(err: super::packet::Error) -> Error {
-        Error::SemtechUdpSerialization(err)
-    }
-}
-
-impl From<mpsc::error::RecvError> for Error {
-    fn from(e: mpsc::error::RecvError) -> Self {
-        Error::AckChannelRecv(e)
-    }
-}
-
-impl From<super::packet::tx_ack::Error> for Error {
-    fn from(e: super::packet::tx_ack::Error) -> Self {
-        Error::AckError(e)
-    }
-}
-
-impl From<oneshot::error::RecvError> for Error {
-    fn from(_: oneshot::error::RecvError) -> Self {
-        Error::AckRecvError
-    }
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let msg = match self {
-            Error::AckChannelRecv(_) => "AckChannelRecv".to_string(),
-            Error::AckError(error) => format!("AckError on transmit {}", error),
-            Error::UnknownMac => "UnknownMac on on transmit".to_string(),
-            Error::UdpError(error) => format!("UdpError: {}", error),
-            Error::ClientEventQueueFull(event) => {
-                format!("Client Event Queue Full. Dropping event: {:?}", event)
-            }
-            Error::InternalQueueClosedOrFull => "Internal Queue Full or Closed".to_string(),
-            Error::SemtechUdpSerialization(err) => {
-                format!("Semtech Udp Serialization Error: {:?}", err)
-            }
-            Error::SendTimeout => "Sending RF Packet Timed Out".to_string(),
-            Error::DispatchWithNoSendPacket => "Dispatched PreparedSend with no Packet".to_string(),
-            Error::AckRecvError => "Error waiting for ACK at sending process".to_string(),
-            Error::ErrorSendingAck => "Error sending ACK to sending process".to_string(),
-        };
-        write!(f, "{}", msg)
-    }
-}
-
-use std::error::Error as StdError;
-
-impl StdError for Error {
-    fn description(&self) -> &str {
-        match self {
-            Error::AckChannelRecv(_) => "AckChannelRecv",
-            Error::AckError(_) => "AckError on transmit",
-            Error::UnknownMac => "UnknownMac on on transmit",
-            Error::UdpError(_) => "UdpError",
-            Error::ClientEventQueueFull(_) => "Client Event Queue Full. Dropping event",
-            Error::InternalQueueClosedOrFull => "Internal Queue Full or Closed",
-            Error::SemtechUdpSerialization(_) => "Semtech Udp Serialization Error",
-            Error::SendTimeout => "Sending RF Packet Timed Out",
-            Error::DispatchWithNoSendPacket => "Dispatched PreparedSend with no Packet",
-            Error::AckRecvError => "Error waiting for ACK at sending process",
-            Error::ErrorSendingAck => "Error sending ACK to sending process",
         }
     }
 }
