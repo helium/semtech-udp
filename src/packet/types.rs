@@ -134,19 +134,14 @@ pub mod data_rate {
         }
     }
 
-    #[derive(Debug)]
+    use thiserror::Error;
+
+    #[derive(Error, Debug)]
     pub enum ParseError {
+        #[error("String with invalid Spreading Factor")]
         InvalidSpreadingFactor,
+        #[error("String with invalid Bandwidth")]
         InvalidBandwidth,
-    }
-    impl std::fmt::Display for ParseError {
-        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            let msg = match self {
-                ParseError::InvalidSpreadingFactor => "Invalid spreading factor input",
-                ParseError::InvalidBandwidth => "Invalid bandwidth input",
-            };
-            write!(f, "{}", msg)
-        }
     }
 
     #[cfg(test)]
