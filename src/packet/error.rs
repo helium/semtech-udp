@@ -7,7 +7,7 @@ pub enum Error {
     #[error("json serialization error")]
     JsonSerialize(#[from] serde_json::error::Error),
     #[error("packet parse error")]
-    ParseError(#[from] ParseError),
+    Parse(#[from] ParseError),
 }
 
 #[derive(Error, Debug)]

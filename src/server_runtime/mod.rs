@@ -367,7 +367,7 @@ impl Internal {
                     }
                     InternalEvent::AckReceived(txack) => {
                         if let Some(sender) = self.downlink_senders.remove(&txack.random_token) {
-                            sender.send(txack).map_err(|_| Error::ErrorSendingAck)?;
+                            sender.send(txack).map_err(|_| Error::AckSend)?;
                         } else {
                             eprintln!("ACK received for unknown random_token")
                         }

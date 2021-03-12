@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("semtech udp error")]
-    SemtechUdpError(#[from] crate::packet::Error),
+    SemtechUdp(#[from] crate::packet::Error),
     #[error("tokio::mpsc send error")]
     SendError(#[from] mpsc::error::SendError<super::TxMessage>),
     #[error("std::io::Error")]

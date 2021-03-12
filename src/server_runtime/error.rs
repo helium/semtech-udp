@@ -7,7 +7,7 @@ pub enum Error {
     #[error("ACK receive channel unexpectedly closed due to dropped sender")]
     AckChannelRecv(#[from] mpsc::error::RecvError),
     #[error("Ack Error received from gateway")]
-    AckError(#[from] crate::packet::tx_ack::Error),
+    Ack(#[from] crate::packet::tx_ack::Error),
     #[error("Send has timed out")]
     SendTimeout,
     #[error("Dispatch called with no packet")]
@@ -23,9 +23,9 @@ pub enum Error {
     #[error("Semtech UDP error")]
     SemtechUdp(#[from] crate::packet::Error),
     #[error("error receiving ACK")]
-    AckRecvError,
+    AckRecv,
     #[error("error sending ACK")]
-    ErrorSendingAck,
+    AckSend,
 }
 
 impl From<tokio::time::error::Elapsed> for Error {
@@ -48,6 +48,6 @@ impl From<mpsc::error::SendError<InternalEvent>> for Error {
 
 impl From<oneshot::error::RecvError> for Error {
     fn from(_: oneshot::error::RecvError) -> Self {
-        Error::AckRecvError
+        Error::AckRecv
     }
 }
