@@ -1,4 +1,3 @@
-use super::Result;
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -8,6 +7,7 @@ pub use types::*;
 
 mod error;
 pub use error::{Error, ParseError};
+pub type Result<T = ()> = std::result::Result<T, Error>;
 
 const PROTOCOL_VERSION: u8 = 2;
 

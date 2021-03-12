@@ -1,8 +1,6 @@
 #[macro_use]
 extern crate arrayref;
 
-pub type Result<T = ()> = std::result::Result<T, Error>;
-
 mod packet;
 pub use packet::*;
 
