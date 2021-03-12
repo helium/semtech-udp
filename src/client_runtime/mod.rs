@@ -3,7 +3,7 @@
    run sending and receiving concurrently as tasks,
    receive downlink packets and send uplink packets easily
 */
-use super::{parser::Parser, pull_data, Down, MacAddress, Packet, SerializablePacket, Up};
+use crate::{parser::Parser, pull_data, Down, MacAddress, Packet, SerializablePacket, Up};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::UdpSocket;
@@ -12,6 +12,10 @@ use tokio::sync::{
     mpsc::{self, Receiver, Sender},
 };
 
+mod error;
+pub use error::Error;
+pub type Result<T = ()> = std::result::Result<T, Error>;
+
 pub type RxMessage = Packet;
 pub type TxMessage = Packet;
 
@@ -19,31 +23,6 @@ pub struct UdpRuntimeRx {
     sender: broadcast::Sender<RxMessage>,
     udp_sender: Sender<TxMessage>,
     socket_recv: Arc<UdpSocket>,
-}
-
-#[derive(Debug)]
-pub enum Error {
-    SemtechUdpSerialize(super::Error),
-    SemtechUdpDeserialize(super::parser::Error),
-    SendError(tokio::sync::mpsc::error::SendError<TxMessage>),
-}
-
-impl From<super::parser::Error> for Error {
-    fn from(err: super::parser::Error) -> Error {
-        Error::SemtechUdpDeserialize(err)
-    }
-}
-
-impl From<tokio::sync::mpsc::error::SendError<TxMessage>> for Error {
-    fn from(err: tokio::sync::mpsc::error::SendError<TxMessage>) -> Error {
-        Error::SendError(err)
-    }
-}
-
-impl From<super::Error> for Error {
-    fn from(err: super::Error) -> Error {
-        Error::SemtechUdpSerialize(err)
-    }
 }
 
 pub struct UdpRuntimeTx {
@@ -72,7 +51,7 @@ impl UdpRuntime {
         self.rx.sender.subscribe()
     }
 
-    pub async fn run(self) -> Result<(), Error> {
+    pub async fn run(self) -> Result<()> {
         let (rx, tx, poll_sender) = self.split();
 
         // udp_runtime_rx reads from the UDP port
@@ -105,11 +84,7 @@ impl UdpRuntime {
         Ok(())
     }
 
-    pub async fn new(
-        mac: [u8; 8],
-        local: SocketAddr,
-        host: SocketAddr,
-    ) -> Result<UdpRuntime, Box<dyn std::error::Error>> {
+    pub async fn new(mac: [u8; 8], local: SocketAddr, host: SocketAddr) -> Result<UdpRuntime> {
         let socket = UdpSocket::bind(&local).await?;
         // "connecting" filters for only frames from the server
         socket.connect(host).await?;
@@ -140,26 +115,31 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 impl UdpRuntimeRx {
-    pub async fn run(self) -> Result<(), Error> {
+    pub async fn run(self) -> Result<()> {
         let mut buf = vec![0u8; 1024];
         loop {
             match self.socket_recv.recv(&mut buf).await {
                 Ok(n) => {
-                    let packet = Packet::parse(&buf[0..n])?;
-                    match packet {
-                        Packet::Up(_) => panic!("Should not be receiving any up packets"),
-                        Packet::Down(down) => match down.clone() {
-                            Down::PullResp(pull_resp) => {
-                                // send downlinks to LoRaWAN layer
-                                self.sender.send(pull_resp.clone().into()).unwrap();
-                                // provide ACK
-                                self.udp_sender.send(pull_resp.into_ack().into()).await?;
+                    match Packet::parse(&buf[0..n]) {
+                        Ok(packet) => {
+                            match packet {
+                                Packet::Up(_) => panic!("Should not be receiving any up packets"),
+                                Packet::Down(down) => match down.clone() {
+                                    Down::PullResp(pull_resp) => {
+                                        // send downlinks to LoRaWAN layer
+                                        self.sender.send(pull_resp.clone().into()).unwrap();
+                                        // provide ACK
+                                        self.udp_sender.send(pull_resp.into_ack().into()).await?;
+                                    }
+                                    Down::PullAck(_) | Down::PushAck(_) => {
+                                        // send downlinks to LoRaWAN layer
+                                        self.sender.send(Packet::Down(down.clone())).unwrap();
+                                    }
+                                },
                             }
-                            Down::PullAck(_) | Down::PushAck(_) => {
-                                // send downlinks to LoRaWAN layer
-                                self.sender.send(Packet::Down(down.clone())).unwrap();
-                            }
-                        },
+                        }
+                        // tolerate bad frames. TODO: logging
+                        Err(_) => (),
                     }
                 }
                 Err(e) => {
@@ -173,7 +153,7 @@ impl UdpRuntimeRx {
 }
 
 impl UdpRuntimeTx {
-    pub async fn run(mut self) -> Result<(), Error> {
+    pub async fn run(mut self) -> Result<()> {
         let mut buf = vec![0u8; 1024];
         loop {
             let tx = self.receiver.recv().await;
