@@ -92,9 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::NoClientWithMac(_packet, mac) => {
                 println!("Tried to send to client with unknown MAC: {:?}", mac)
             }
-            Event::RawPacket(raw) => {
-                println!("Raw {:?}", raw)
-            }
+            Event::RawPacket(_) => (),
         }
     }
 }
