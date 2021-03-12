@@ -117,7 +117,7 @@ use crate::packet::StringOrNum;
 #[test]
 fn test_immediate_send() {
     use crate::packet::pull_resp::TxPk;
-    let json = "{\"codr\":\"4/5\",\"data\":\"QDDaAAHUbYkmAGY3AFAvfpbHJeCeuDu3xbCCHeg7YPOUJOfBCSc4Y3LtT4aToTGl9AYK4+NiALvTgey0M4ZJzh43vLaaXzFHko0jlb0CVeNgAtbTsAttQ\",\"datr\":\"SF10BW125\",\"freq\":904.1,\"imme\":true,\"ipol\":false,\"modu\":\"LORA\",\"powe\":27,\"rfch\":0,\"size\":87,\"tmst\":\"immediate\"}";
+    let json = "{\"codr\":\"4/5\",\"data\":\"IHLF2EA+n8BFY1vrCU1k/Vg=\",\"datr\":\"SF10BW125\",\"freq\":904.1,\"imme\":true,\"ipol\":false,\"modu\":\"LORA\",\"powe\":27,\"rfch\":0,\"size\":87,\"tmst\":\"immediate\"}";
 
     let txpk: TxPk = serde_json::from_str(json).unwrap();
     if let StringOrNum::S(_) = txpk.tmst {
@@ -134,6 +134,44 @@ fn test_timed_send() {
     let txpk: TxPk = serde_json::from_str(json).unwrap();
     if let StringOrNum::N(_) = txpk.tmst {
         assert!(true);
+    } else {
+        assert!(false);
+    }
+}
+
+#[test]
+fn new_packet() {
+    let recv = [
+        2, 159, 48, 0, 0, 128, 0, 0, 160, 0, 102, 31, 123, 34, 114, 120, 112, 107, 34, 58, 91, 123,
+        34, 116, 109, 115, 116, 34, 58, 52, 50, 48, 50, 56, 55, 57, 48, 56, 52, 44, 34, 116, 105,
+        109, 101, 34, 58, 34, 50, 48, 50, 49, 45, 48, 50, 45, 48, 51, 84, 49, 57, 58, 48, 51, 58,
+        52, 54, 46, 53, 48, 48, 51, 52, 57, 90, 34, 44, 34, 116, 109, 109, 115, 34, 58, 49, 50, 57,
+        54, 52, 49, 52, 50, 52, 52, 53, 48, 48, 44, 34, 99, 104, 97, 110, 34, 58, 51, 44, 34, 114,
+        102, 99, 104, 34, 58, 48, 44, 34, 102, 114, 101, 113, 34, 58, 57, 48, 52, 46, 53, 48, 48,
+        48, 48, 48, 44, 34, 115, 116, 97, 116, 34, 58, 45, 49, 44, 34, 109, 111, 100, 117, 34, 58,
+        34, 76, 79, 82, 65, 34, 44, 34, 100, 97, 116, 114, 34, 58, 34, 83, 70, 49, 48, 66, 87, 49,
+        50, 53, 34, 44, 34, 99, 111, 100, 114, 34, 58, 34, 52, 47, 53, 34, 44, 34, 108, 115, 110,
+        114, 34, 58, 45, 49, 53, 46, 53, 44, 34, 114, 115, 115, 105, 34, 58, 45, 49, 49, 53, 44,
+        34, 115, 105, 122, 101, 34, 58, 49, 54, 44, 34, 100, 97, 116, 97, 34, 58, 34, 81, 77, 114,
+        111, 67, 111, 110, 100, 73, 71, 54, 106, 57, 84, 52, 81, 99, 82, 75, 100, 57, 119, 61, 61,
+        34, 125, 93, 125,
+    ];
+
+    let packet = Packet::parse(&recv).unwrap();
+
+    if let Packet::Up(Up::PushData(packet)) = packet {
+        let _packet_first_read = Packet::parse(&recv).unwrap();
+
+        let mut buffer_first = [0; 512];
+        let written_first = packet.serialize(&mut buffer_first).unwrap();
+
+        let packet_second_read = Packet::parse(&buffer_first[..written_first as usize]).unwrap();
+        if let Packet::Up(Up::PushData(packet_second_read)) = packet_second_read {
+            let mut buffer_second = [0; 512];
+            let _written_second = packet_second_read.serialize(&mut buffer_second).unwrap();
+        } else {
+            assert!(false);
+        }
     } else {
         assert!(false);
     }

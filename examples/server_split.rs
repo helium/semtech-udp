@@ -1,7 +1,7 @@
 use semtech_udp::{
     pull_resp,
     server_runtime::{Event, UdpRuntime},
-    MacAddress, StringOrNum,
+    Bandwidth, CodingRate, DataRate, MacAddress, Modulation, SpreadingFactor, StringOrNum,
 };
 use std::net::SocketAddr;
 use structopt::StructOpt;
@@ -28,9 +28,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut first_shot = true;
         while cli.delay != 0 || first_shot {
             first_shot = false;
-            let buffer = vec![0; cli.length];
-            let size = buffer.len() as u64;
-            let data = base64::encode(buffer);
+            let data = vec![0; cli.length];
+            let size = data.len() as u64;
             let tmst = StringOrNum::N(0);
 
             let txpk = pull_resp::TxPk {
@@ -39,9 +38,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 freq: cli.frequency,
                 rfch: 0,
                 powe: cli.power as u64,
-                modu: "LORA".to_string(),
-                datr: cli.data_rate.clone(),
-                codr: "4/5".to_string(),
+                modu: Modulation::LORA,
+                datr: DataRate::new(cli.spreading_factor.clone(), cli.bandwidth.clone()),
+                codr: CodingRate::_4_5,
                 ipol: cli.polarization_inversion,
                 size,
                 data,
@@ -121,9 +120,13 @@ pub struct Opt {
     #[structopt(long, default_value = "868.1")]
     frequency: f64,
 
-    /// Data rate (Spreading Factor / Bandwidth)
-    #[structopt(long, default_value = "SF12BW125")]
-    data_rate: String,
+    /// Spreading Factor (eg: SF12)
+    #[structopt(long, default_value = "SF12")]
+    spreading_factor: SpreadingFactor,
+
+    /// Bandwdith (eg: BW125)
+    #[structopt(long, default_value = "BW125")]
+    bandwidth: Bandwidth,
 
     /// Polarization inversion (set true when sending to devices)
     #[structopt(long)]

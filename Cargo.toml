@@ -1,6 +1,6 @@
 [package]
 name = "semtech-udp"
-version = "0.4.2-alpha.0"
+version = "0.5.0"
 authors = ["Louis Thiery <thiery.louis@gmail.com>"]
 edition = "2018"
 description = "Semtech UDP provides serialization and deserialization of packets complying with the Semtech UDP protocol"
@@ -25,13 +25,12 @@ num_enum = "0.4"
 arrayref = "0.3"
 serde_json = { version = "1.0" }
 serde = { version = "1.0.100", default-features = false,  features = ["derive"] }
+serde_repr = "0.1"
 rand = "0.7.3"
+base64 = "0.13.0"
 
 [dev-dependencies]
-etherparse = "0.9.0"
-pcap = "0.7.0"
 lorawan = "0.6.0"
-base64 = "0.12.0"
 structopt = { version = "0.3.2", default-features = false }
 
 [dependencies.tokio]

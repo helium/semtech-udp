@@ -1,7 +1,7 @@
 use semtech_udp::{
     pull_resp,
     server_runtime::{Event, UdpRuntime},
-    StringOrNum,
+    CodingRate, DataRate, Modulation, StringOrNum,
 };
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -30,9 +30,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::PacketReceived(rxpk, gateway_mac) => {
                 println!("{:?}", rxpk);
 
-                let buffer = [1, 2, 3, 4];
-                let size = buffer.len() as u64;
-                let data = base64::encode(buffer);
+                let data = vec![1, 2, 3, 4];
+                let size = data.len() as u64;
                 let tmst = StringOrNum::N(rxpk.get_timestamp() + 1_000_000);
 
                 let txpk = pull_resp::TxPk {
@@ -41,9 +40,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     freq: 902.800_000,
                     rfch: 0,
                     powe: 27,
-                    modu: "LORA".to_string(),
-                    datr: "SF8BW500".to_string(),
-                    codr: "4/5".to_string(),
+                    modu: Modulation::LORA,
+                    datr: DataRate::default(),
+                    codr: CodingRate::_4_5,
                     ipol: true,
                     size,
                     data,
