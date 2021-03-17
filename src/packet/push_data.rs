@@ -302,7 +302,8 @@ pub struct Stat {
     rxnb: u64,
     rxok: u64,
     rxfw: u64,
-    ackr: f64,
+    // if there were no upstream datagrams, this field can be null
+    ackr: Option<f64>,
     dwnb: u64,
     txnb: u64,
 }
