@@ -22,49 +22,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx, rx): (Sender<MacAddress>, Receiver<MacAddress>) = oneshot::channel();
     let mut tx = Some(tx);
 
-    // spawn off tx thread for sending packets
-    tokio::spawn(async move {
-        let gateway_mac = rx.await.unwrap();
-        let mut first_shot = true;
-        while cli.delay != 0 || first_shot {
-            first_shot = false;
-            let data = vec![0; cli.length];
-            let size = data.len() as u64;
-            let tmst = StringOrNum::N(0);
+    let debug = cli.debug;
 
-            let txpk = pull_resp::TxPk {
-                imme: true,
-                tmst,
-                freq: cli.frequency,
-                rfch: 0,
-                powe: cli.power as u64,
-                modu: Modulation::LORA,
-                datr: DataRate::new(cli.spreading_factor.clone(), cli.bandwidth.clone()),
-                codr: CodingRate::_4_5,
-                ipol: cli.polarization_inversion,
-                size,
-                data,
-                tmms: None,
-                fdev: None,
-                prea: None,
-                ncrc: None,
-            };
+    if cli.test {
+        // spawn off tx thread for sending packets
+        tokio::spawn(async move {
+            let gateway_mac = rx.await.unwrap();
+            let mut first_shot = true;
+            while cli.delay != 0 || first_shot {
+                first_shot = false;
+                let data = vec![0; cli.length];
+                let size = data.len() as u64;
+                let tmst = StringOrNum::N(0);
 
-            println!("Sending: {:?}", txpk);
+                let txpk = pull_resp::TxPk {
+                    imme: true,
+                    tmst,
+                    freq: cli.frequency,
+                    rfch: 0,
+                    powe: cli.power as u64,
+                    modu: Modulation::LORA,
+                    datr: DataRate::new(cli.spreading_factor.clone(), cli.bandwidth.clone()),
+                    codr: CodingRate::_4_5,
+                    ipol: cli.polarization_inversion,
+                    size,
+                    data,
+                    tmms: None,
+                    fdev: None,
+                    prea: None,
+                    ncrc: None,
+                };
 
-            let prepared_send = client_tx.prepare_downlink(Some(txpk), gateway_mac);
+                println!("Sending: {:?}", txpk);
 
-            tokio::spawn(async move {
-                if let Err(e) = prepared_send.dispatch(Some(Duration::from_secs(5))).await {
-                    panic!("Transmit Dispatch threw error: {:?}", e)
-                } else {
-                    println!("Send complete");
-                }
-            });
+                let prepared_send = client_tx.prepare_downlink(Some(txpk), gateway_mac);
 
-            sleep(Duration::from_secs(cli.delay)).await;
-        }
-    });
+                tokio::spawn(async move {
+                    if let Err(e) = prepared_send.dispatch(Some(Duration::from_secs(5))).await {
+                        panic!("Transmit Dispatch threw error: {:?}", e)
+                    } else {
+                        println!("Send complete");
+                    }
+                });
+
+                sleep(Duration::from_secs(cli.delay)).await;
+            }
+        });
+    }
 
     println!("Ready for clients");
     loop {
@@ -87,12 +91,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Event::PacketReceived(rxpk, addr) => {
                 println!("Packet Receveived from {}:", addr);
-                println!("{:?}", rxpk);
+                println!("\t{:?}", rxpk);
             }
             Event::NoClientWithMac(_packet, mac) => {
                 println!("Tried to send to client with unknown MAC: {:?}", mac)
             }
-            Event::RawPacket(_) => (),
+            Event::RawPacket(pkt) => {
+                if debug {
+                    println!("RawPacket: {:?}", pkt)
+                }
+            }
         }
     }
 }
@@ -103,6 +111,10 @@ pub struct Opt {
     /// Port to run service on
     #[structopt(long, default_value = "1680")]
     port: u16,
+
+    /// whether to provide all raw packets
+    #[structopt(long)]
+    test: bool,
 
     /// Power output
     #[structopt(long, default_value = "27")]
@@ -131,4 +143,8 @@ pub struct Opt {
     /// Polarization inversion (set true when sending to devices)
     #[structopt(long)]
     polarization_inversion: bool,
+
+    /// whether to provide all raw packets
+    #[structopt(long)]
+    debug: bool,
 }
