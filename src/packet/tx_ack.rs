@@ -33,11 +33,7 @@ impl Packet {
     }
 
     pub fn get_error(&self) -> Option<Error> {
-        if let Some(txpk_ack) = &self.data {
-            Some(txpk_ack.txpk_ack.error)
-        } else {
-            None
-        }
+        self.data.as_ref().map(|txpk_ack| txpk_ack.txpk_ack.error)
     }
 }
 

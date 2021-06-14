@@ -3,12 +3,11 @@ use semtech_udp::{
     server_runtime::{self, Event, UdpRuntime},
     MacAddress,
 };
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
 use structopt::StructOpt;
-use std::collections::HashMap;
-
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -30,16 +29,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::NewClient((mac, addr)) => {
                 println!("New packet forwarder client: {}, {}", mac, addr);
 
-                let mut clients  = Vec::new();
+                let mut clients = Vec::new();
                 for port in &cli.client {
                     println!("Port {}", port);
-                    clients.push(client_instance(client_tx.clone(), mac.clone(), port.clone()).await?);
+                    clients
+                        .push(client_instance(client_tx.clone(), mac.clone(), port.clone()).await?);
                 }
 
-                mux.insert(
-                    mac,
-                    clients,
-                );
+                mux.insert(mac, clients);
             }
             Event::UpdateClient((mac, addr)) => {
                 println!("Mac existed, but IP updated: {}, {}", mac, addr);
@@ -54,7 +51,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         sender.send(packet.into()).await?;
                     }
                 }
-
             }
             Event::NoClientWithMac(_packet, mac) => {
                 println!("Tried to send to client with unknown MAC: {:?}", mac)
@@ -83,7 +79,11 @@ async fn client_instance(
 ) -> Result<tokio::sync::mpsc::Sender<semtech_udp::Packet>, Box<dyn std::error::Error>> {
     let outbound = SocketAddr::from(([127, 0, 0, 1], 0));
     let host = SocketAddr::from_str(&host)?;
-    println!("Connecting to server {} from port {}", host, outbound.port());
+    println!(
+        "Connecting to server {} from port {}",
+        host,
+        outbound.port()
+    );
     let bytes = mac_address.bytes();
     let udp_runtime = client_runtime::UdpRuntime::new(
         [
@@ -112,7 +112,9 @@ async fn client_instance(
                         let txpk = packet.data.txpk.clone();
                         let prepared_send = client_tx.prepare_downlink(Some(txpk), mac_address);
                         tokio::spawn(async move {
-                            if let Err(e) = prepared_send.dispatch(Some(Duration::from_secs(5))).await {
+                            if let Err(e) =
+                                prepared_send.dispatch(Some(Duration::from_secs(5))).await
+                            {
                                 println!("Transmit Dispatch threw error: {:?}", e)
                             } else {
                                 println!("Send complete");

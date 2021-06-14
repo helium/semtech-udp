@@ -71,7 +71,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "virtual-lorawan-device", about = "LoRaWAN test device utility")]
+#[structopt(
+    name = "Semtech GWMP over UDP Host Example",
+    about = "LoRaWAN test device utility"
+)]
 pub struct Opt {
     /// port to run service on
     #[structopt(short, long, default_value = "1680")]
