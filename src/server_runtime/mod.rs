@@ -101,7 +101,11 @@ impl Downlink {
             // wait for the ACK for the protocol layer
             let ack = receiver.await?;
             if let Some(error) = ack.get_error() {
-                Err(error.into())
+                if let crate::packet::tx_ack::Error::NONE = error {
+                    Ok(())
+                } else {
+                    Err(error.into())
+                }
             } else {
                 Ok(())
             }

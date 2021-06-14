@@ -7,16 +7,18 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
 use structopt::StructOpt;
+use std::collections::HashMap;
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Opt::from_args();
-    let addr = SocketAddr::from(([0, 0, 0, 0], cli.host_port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], cli.host));
     let (mut client_rx, client_tx) = UdpRuntime::new(addr).await?.split();
 
     println!("Starting server: {}", addr);
 
-    let mut client_sender = None;
+    let mut mux = HashMap::new();
 
     println!("Ready for clients");
     loop {
@@ -27,18 +29,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Event::NewClient((mac, addr)) => {
                 println!("New packet forwarder client: {}, {}", mac, addr);
-                client_sender = Some(client_instance(client_tx.clone(), mac, cli.client_port).await?);
+
+                let mut clients  = Vec::new();
+                for port in &cli.client {
+                    println!("Port {}", port);
+                    clients.push(client_instance(client_tx.clone(), mac.clone(), port.clone()).await?);
+                }
+
+                mux.insert(
+                    mac,
+                    clients,
+                );
             }
             Event::UpdateClient((mac, addr)) => {
                 println!("Mac existed, but IP updated: {}, {}", mac, addr);
             }
             Event::PacketReceived(rxpk, gateway_mac) => {
                 println!("Uplink Received {:?}", rxpk);
-                if let Some(sender)= &mut client_sender {
-                    let mut packet = push_data::Packet::from_rxpk(rxpk);
-                    packet.gateway_mac = gateway_mac;
-                    sender.send(packet.into()).await?;
+                if let Some(clients) = mux.get_mut(&gateway_mac) {
+                    for sender in clients {
+                        println!("Forwarding Uplink");
+                        let mut packet = push_data::Packet::from_rxpk(rxpk.clone());
+                        packet.gateway_mac = gateway_mac;
+                        sender.send(packet.into()).await?;
+                    }
                 }
+
             }
             Event::NoClientWithMac(_packet, mac) => {
                 println!("Tried to send to client with unknown MAC: {:?}", mac)
@@ -49,24 +65,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "virtual-lorawan-device", about = "LoRaWAN test device utility")]
+#[structopt(name = "lora-mux", about = "GWMP Mux")]
 pub struct Opt {
     /// port to host the service on
     #[structopt(long, default_value = "1681")]
-    pub host_port: u16,
-    /// port to attach the client on
+    pub host: u16,
+    /// addresses to be clients to (eg: 127.0.0.1:1680)
+    /// WARNING: all addresses will receive all ACKs for transmits
     #[structopt(long, default_value = "1680")]
-    pub client_port: u16,
+    pub client: Vec<String>,
 }
 
 async fn client_instance(
     mut client_tx: server_runtime::ClientTx,
     mac_address: MacAddress,
-    port: u16,
+    host: String,
 ) -> Result<tokio::sync::mpsc::Sender<semtech_udp::Packet>, Box<dyn std::error::Error>> {
     let outbound = SocketAddr::from(([127, 0, 0, 1], 0));
-    let host = SocketAddr::from_str(&format!("127.0.0.1:{}", port))?;
-    println!("Connecting to server {} from port {}", host, port);
+    let host = SocketAddr::from_str(&host)?;
+    println!("Connecting to server {} from port {}", host, outbound.port());
     let bytes = mac_address.bytes();
     let udp_runtime = client_runtime::UdpRuntime::new(
         [
