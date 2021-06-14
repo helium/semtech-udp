@@ -37,7 +37,11 @@ impl Packet {
     }
 
     pub fn get_error(&self) -> Option<Error> {
-        self.data.as_ref().map(|txpk_ack| txpk_ack.txpk_ack.error)
+        if self.has_error() {
+            self.data.as_ref().map(|txpk_ack| txpk_ack.txpk_ack.error)
+        } else {
+            None
+        }
     }
 }
 
