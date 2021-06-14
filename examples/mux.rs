@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "lora-mux", about = "GWMP Mux")]
+#[structopt(name = "lora-mux", about = "Semtech GWMP over UDP Mux")]
 pub struct Opt {
     /// port to host the service on
     #[structopt(long, default_value = "1681")]
