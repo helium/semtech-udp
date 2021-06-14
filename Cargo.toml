@@ -1,6 +1,6 @@
 [package]
 name = "semtech-udp"
-version = "0.5.1"
+version = "0.5.2-alpha.0"
 authors = ["Louis Thiery <thiery.louis@gmail.com>"]
 edition = "2018"
 description = "Semtech UDP provides serialization and deserialization of packets complying with the Semtech UDP protocol"
