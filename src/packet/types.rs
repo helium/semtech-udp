@@ -176,6 +176,7 @@ pub mod data_rate {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum CodingRate {
     #[serde(rename(serialize = "4/5", deserialize = "4/5"))]
     _4_5,

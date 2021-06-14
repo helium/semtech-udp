@@ -106,7 +106,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "semtech-server", about = "LoRa test device utility")]
+#[structopt(
+    name = "Semtech GWMP over UDP Host Example",
+    about = "Example application for semtech-udp library"
+)]
 pub struct Opt {
     /// Port to run service on
     #[structopt(long, default_value = "1680")]

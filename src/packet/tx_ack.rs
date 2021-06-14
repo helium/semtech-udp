@@ -29,12 +29,16 @@ pub struct Packet {
 
 impl Packet {
     pub fn has_error(&self) -> bool {
-        self.data.is_some()
+        if let Some(error) = &self.data {
+            Error::NONE != error.txpk_ack.error
+        } else {
+            false
+        }
     }
 
     pub fn get_error(&self) -> Option<Error> {
-        if let Some(txpk_ack) = &self.data {
-            Some(txpk_ack.txpk_ack.error)
+        if self.has_error() {
+            self.data.as_ref().map(|txpk_ack| txpk_ack.txpk_ack.error)
         } else {
             None
         }
@@ -83,7 +87,7 @@ impl From<Packet> for super::Packet {
 
 use thiserror::Error;
 
-#[derive(Error, Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Error, Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum Error {
     #[error("TxAck::Error::NONE")]
