@@ -41,7 +41,6 @@ impl Parser for Packet {
                     Identifier::PushData => {
                         let gateway_mac = gateway_mac(&buffer[..PACKET_PAYLOAD_START]);
                         let json_str = std::str::from_utf8(&buffer[PACKET_PAYLOAD_START..])?;
-                        println!("{}", json_str);
                         let data = serde_json::from_str(json_str)?;
 
                         push_data::Packet {
