@@ -90,6 +90,10 @@ impl Downlink {
         });
     }
 
+    pub fn get_destination_mac(&mut self) -> MacAddress {
+        self.mac
+    }
+
     async fn just_dispatch(self) -> Result {
         if let Some(packet) = self.packet {
             let (sender, receiver) = oneshot::channel();

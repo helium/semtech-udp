@@ -194,11 +194,31 @@ pub struct RSig {
     pub ftdelta: Option<isize>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum RxPk {
     V1(RxPkV1),
     V2(RxPkV2),
+}
+
+use std::fmt;
+impl fmt::Display for RxPk {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "@{} ms, {:.2} MHz, {:?}, {}, snr: {}, len: {}",
+            self.get_timestamp(),
+            self.get_frequency(),
+            self.get_datarate(),
+            if let Some(rssis) = self.get_signal_rssi() {
+                format!("rssis: {}", rssis)
+            } else {
+                format!("rssic: {}", self.get_channel_rssi())
+            },
+            self.get_snr(),
+            self.get_data().len()
+        )
+    }
 }
 
 macro_rules! get_field {

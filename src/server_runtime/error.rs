@@ -4,8 +4,6 @@ use tokio::sync::{mpsc, oneshot};
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("ACK receive channel unexpectedly closed due to dropped sender")]
-    AckChannelRecv(#[from] mpsc::error::RecvError),
     #[error("Ack Error received from gateway")]
     Ack(#[from] crate::packet::tx_ack::Error),
     #[error("Send has timed out")]
