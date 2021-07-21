@@ -110,6 +110,24 @@ pub struct TxPk {
     pub ncrc: Option<bool>, // If true, disable the CRC of the physical layer (optional)
 }
 
+use std::fmt;
+impl fmt::Display for TxPk {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}, {:.2} MHz, {:?}, len: {}",
+            if let StringOrNum::N(time) = self.tmst {
+                format!("@{} ms", time)
+            } else {
+                "immediately".into()
+            },
+            self.freq,
+            self.datr,
+            self.size
+        )
+    }
+}
+
 impl SerializablePacket for Packet {
     fn serialize(&self, buffer: &mut [u8]) -> std::result::Result<u64, PktError> {
         let mut w = Cursor::new(buffer);
