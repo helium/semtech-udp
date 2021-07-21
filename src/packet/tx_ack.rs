@@ -70,8 +70,10 @@ impl From<Packet> for super::Packet {
 // ```
 
 use thiserror::Error;
-
-#[derive(Error, Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+/// We take all of the errors from the GWMP protocol
+/// except for the NONE response. We write a custom
+/// serializer and deserializer to accommodate that
+#[derive(Error, Debug, Clone, Copy, PartialEq)]
 pub enum Error {
     #[error("TxAck::Error::TOO_LATE")]
     TooLate,
@@ -119,6 +121,9 @@ struct SubTxPkAck {
     pub error: Result<(), Error>,
 }
 
+/// Because `error: NONE` is possible, we write a custom serializer
+/// and deserializer that will provide Ok(()) the NONE case but the
+/// tx_ack::Error type in other cases
 use serde::{
     de::{self, Deserializer},
     Serializer,
