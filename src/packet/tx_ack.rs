@@ -133,7 +133,7 @@ where
     D: Deserializer<'de>,
 {
     match String::deserialize(d)?.as_str() {
-        "None" => Ok(Ok(())),
+        "NONE" => Ok(Ok(())),
         "TOO_LATE" => Ok(Err(Error::TooLate)),
         "TOO_EARLY" => Ok(Err(Error::TooEarly)),
         "COLLISION_PACKET" => Ok(Err(Error::CollisionPacket)),
@@ -143,7 +143,7 @@ where
         "GPS_UNLOCKED" => Ok(Err(Error::GpsUnlocked)),
         "SEND_LBT" => Ok(Err(Error::SendLBT)),
         "SEND_FAIL" => Ok(Err(Error::SendFail)),
-        _ => Err(de::Error::custom("path contains invalid UTF-8 characters")),
+        _ => Err(de::Error::custom("Unexpected String in txpk_ack.error field")),
     }
 }
 
