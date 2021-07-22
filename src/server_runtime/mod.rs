@@ -103,12 +103,7 @@ impl Downlink {
                 .await?;
 
             // wait for the ACK for the protocol layer
-            let ack = receiver.await?;
-            if let Some(error) = ack.get_error() {
-                Err(error.into())
-            } else {
-                Ok(())
-            }
+            receiver.await?.get_result().map_err(|e| e.into())
         } else {
             Err(Error::DispatchWithNoSendPacket)
         }

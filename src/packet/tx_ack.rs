@@ -24,24 +24,12 @@ use std::io::{Cursor, Write};
 pub struct Packet {
     pub random_token: u16,
     pub gateway_mac: MacAddress,
-    pub data: Option<TxPkNack>,
+    pub data: TxPkNack,
 }
 
 impl Packet {
-    pub fn has_error(&self) -> bool {
-        if let Some(error) = &self.data {
-            Error::NONE != error.txpk_ack.error
-        } else {
-            false
-        }
-    }
-
-    pub fn get_error(&self) -> Option<Error> {
-        if self.has_error() {
-            self.data.as_ref().map(|txpk_ack| txpk_ack.txpk_ack.error)
-        } else {
-            None
-        }
+    pub fn get_result(&self) -> Result<(), Error> {
+        self.data.txpk_ack.error
     }
 }
 
@@ -51,11 +39,7 @@ impl SerializablePacket for Packet {
         write_preamble(&mut w, self.random_token)?;
         w.write_all(&[Identifier::TxAck as u8])?;
         w.write_all(&self.gateway_mac.bytes())?;
-
-        if let Some(data) = &self.data {
-            w.write_all(&serde_json::to_string(&data)?.as_bytes())?;
-        }
-
+        w.write_all(&serde_json::to_string(&self.data)?.as_bytes())?;
         Ok(w.position())
     }
 }
@@ -86,30 +70,29 @@ impl From<Packet> for super::Packet {
 // ```
 
 use thiserror::Error;
-
-#[derive(Error, Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
-#[allow(non_camel_case_types)]
+/// We take all of the errors from the GWMP protocol
+/// except for the NONE response. We write a custom
+/// serializer and deserializer to accommodate that
+#[derive(Error, Debug, Clone, Copy, PartialEq)]
 pub enum Error {
-    #[error("TxAck::Error::NONE")]
-    NONE,
     #[error("TxAck::Error::TOO_LATE")]
-    TOO_LATE,
+    TooLate,
     #[error("TxAck::Error::TOO_EARLY")]
-    TOO_EARLY,
+    TooEarly,
     #[error("TxAck::Error::COLLISION_PACKET")]
-    COLLISION_PACKET,
+    CollisionPacket,
     #[error("TxAck::Error::COLLISION_BEACON")]
-    COLLISION_BEACON,
+    CollisionBeacon,
     #[error("TxAck::Error::TX_FREQ")]
-    TX_FREQ,
+    InvalidTransmitFrequency,
     #[error("TxAck::Error::TX_POWER")]
-    TX_POWER,
+    InvalidTransmitPower,
     #[error("TxAck::Error::GPS_UNLOCKED")]
-    GPS_UNLOCKED,
+    GpsUnlocked,
     #[error("TxAck::Error::SEND_LBT")]
-    SEND_LBT,
+    SendLBT,
     #[error("TxAck::Error::SEND_FAIL")]
-    SEND_FAIL,
+    SendFail,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -117,14 +100,69 @@ pub struct TxPkNack {
     txpk_ack: SubTxPkAck,
 }
 
-impl TxPkNack {
-    pub fn new(error: Error) -> TxPkNack {
+impl Default for TxPkNack {
+    fn default() -> Self {
         TxPkNack {
-            txpk_ack: SubTxPkAck { error },
+            txpk_ack: SubTxPkAck { error: Ok(()) },
         }
     }
 }
-#[derive(Debug, Serialize, Deserialize, Clone)]
+
+impl TxPkNack {
+    pub fn new_with_error(error: Error) -> TxPkNack {
+        TxPkNack {
+            txpk_ack: SubTxPkAck { error: Err(error) },
+        }
+    }
+}
+#[derive(Debug, Serialize, Clone, Deserialize)]
 struct SubTxPkAck {
-    pub error: Error,
+    #[serde(deserialize_with = "deserialize", serialize_with = "serialize")]
+    pub error: Result<(), Error>,
+}
+
+/// Because `error: NONE` is possible, we write a custom serializer
+/// and deserializer that will provide Ok(()) the NONE case but the
+/// tx_ack::Error type in other cases
+use serde::{
+    de::{self, Deserializer},
+    Serializer,
+};
+pub fn deserialize<'de, D>(d: D) -> std::result::Result<Result<(), Error>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(d)?.as_str() {
+        "NONE" => Ok(Ok(())),
+        "TOO_LATE" => Ok(Err(Error::TooLate)),
+        "TOO_EARLY" => Ok(Err(Error::TooEarly)),
+        "COLLISION_PACKET" => Ok(Err(Error::CollisionPacket)),
+        "COLLISION_BEACON" => Ok(Err(Error::CollisionBeacon)),
+        "TX_FREQ" => Ok(Err(Error::InvalidTransmitFrequency)),
+        "TX_POWER" => Ok(Err(Error::InvalidTransmitPower)),
+        "GPS_UNLOCKED" => Ok(Err(Error::GpsUnlocked)),
+        "SEND_LBT" => Ok(Err(Error::SendLBT)),
+        "SEND_FAIL" => Ok(Err(Error::SendFail)),
+        _ => Err(de::Error::custom(
+            "Unexpected String in txpk_ack.error field",
+        )),
+    }
+}
+
+fn serialize<S>(res: &Result<(), Error>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match res {
+        Ok(()) => s.serialize_str("NONE"),
+        Err(Error::TooLate) => s.serialize_str("TOO_LATE"),
+        Err(Error::TooEarly) => s.serialize_str("TOO_EARLY"),
+        Err(Error::CollisionPacket) => s.serialize_str("COLLISION_PACKET"),
+        Err(Error::CollisionBeacon) => s.serialize_str("COLLISION_BEACON"),
+        Err(Error::InvalidTransmitFrequency) => s.serialize_str("TX_FREQ"),
+        Err(Error::InvalidTransmitPower) => s.serialize_str("TX_POWER"),
+        Err(Error::GpsUnlocked) => s.serialize_str("GPS_UNLOCKED"),
+        Err(Error::SendLBT) => s.serialize_str("SEND_LBT"),
+        Err(Error::SendFail) => s.serialize_str("SEND_FAIL"),
+    }
 }

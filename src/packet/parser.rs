@@ -1,4 +1,5 @@
 use super::*;
+use crate::tx_ack::TxPkNack;
 use std::convert::TryFrom;
 
 const PROTOCOL_VERSION_INDEX: usize = 0;
@@ -54,9 +55,9 @@ impl Parser for Packet {
                         let gateway_mac = gateway_mac(&buffer[..PACKET_PAYLOAD_START]);
                         let data = if buffer.len() > PACKET_PAYLOAD_START {
                             let json_str = std::str::from_utf8(&buffer[PACKET_PAYLOAD_START..])?;
-                            Some(serde_json::from_str(json_str).unwrap())
+                            serde_json::from_str(json_str)?
                         } else {
-                            None
+                            TxPkNack::default()
                         };
                         tx_ack::Packet {
                             random_token,
