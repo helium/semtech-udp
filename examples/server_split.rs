@@ -29,11 +29,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::spawn(async move {
             let gateway_mac = rx.await.unwrap();
             let mut first_shot = true;
+
             while cli.delay != 0 || first_shot {
                 first_shot = false;
                 let data = vec![0; cli.length];
                 let size = data.len() as u64;
-                let tmst = StringOrNum::N(0);
+                let tmst = StringOrNum::S("immedate".into());
 
                 let txpk = pull_resp::TxPk {
                     imme: true,
@@ -53,13 +54,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ncrc: None,
                 };
 
-                println!("Sending: {:?}", txpk);
+                println!("Sending: {}", txpk);
 
                 let prepared_send = client_tx.prepare_downlink(Some(txpk), gateway_mac);
 
                 tokio::spawn(async move {
                     if let Err(e) = prepared_send.dispatch(Some(Duration::from_secs(5))).await {
-                        panic!("Transmit Dispatch threw error: {:?}", e)
+                        println!("Transmit Dispatch threw error: {:?}", e)
                     } else {
                         println!("Send complete");
                     }
