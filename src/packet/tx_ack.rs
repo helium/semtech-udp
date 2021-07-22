@@ -143,7 +143,9 @@ where
         "GPS_UNLOCKED" => Ok(Err(Error::GpsUnlocked)),
         "SEND_LBT" => Ok(Err(Error::SendLBT)),
         "SEND_FAIL" => Ok(Err(Error::SendFail)),
-        _ => Err(de::Error::custom("Unexpected String in txpk_ack.error field")),
+        _ => Err(de::Error::custom(
+            "Unexpected String in txpk_ack.error field",
+        )),
     }
 }
 
