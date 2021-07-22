@@ -55,7 +55,7 @@ impl Parser for Packet {
                         let gateway_mac = gateway_mac(&buffer[..PACKET_PAYLOAD_START]);
                         let data = if buffer.len() > PACKET_PAYLOAD_START {
                             let json_str = std::str::from_utf8(&buffer[PACKET_PAYLOAD_START..])?;
-                            serde_json::from_str(json_str).unwrap()
+                            serde_json::from_str(json_str)?
                         } else {
                             TxPkNack::default()
                         };
