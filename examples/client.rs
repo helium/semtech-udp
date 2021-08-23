@@ -54,9 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(
-    name = "Semtech GWMP over UDP Client Example",
-)]
+#[structopt(name = "Semtech GWMP over UDP Client Example")]
 pub struct Opt {
     /// dial out port
     #[structopt(short, long, default_value = "1600")]
