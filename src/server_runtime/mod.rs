@@ -2,6 +2,8 @@ use super::{
     parser::Parser, pull_resp, pull_resp::TxPk, tx_ack::Packet as TxAck, MacAddress, Packet,
     SerializablePacket, Up,
 };
+pub use crate::push_data::RxPk;
+use log::warn;
 use std::sync::Arc;
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tokio::{
@@ -9,8 +11,6 @@ use tokio::{
     sync::{mpsc, oneshot},
     time::timeout,
 };
-
-pub use crate::push_data::RxPk;
 
 mod error;
 pub use error::Error;
@@ -76,7 +76,6 @@ use rand::Rng;
 
 #[derive(Clone)]
 pub struct Downlink {
-    random_token: u16,
     mac: MacAddress,
     packet: Option<pull_resp::Packet>,
     sender: mpsc::Sender<InternalEvent>,
@@ -85,7 +84,7 @@ pub struct Downlink {
 impl Downlink {
     pub fn set_packet(&mut self, txpk: TxPk) {
         self.packet = Some(pull_resp::Packet {
-            random_token: self.random_token,
+            random_token: rand::thread_rng().gen(),
             data: pull_resp::Data::from_txpk(txpk),
         });
     }
@@ -133,21 +132,12 @@ impl ClientTx {
     }
 
     pub fn prepare_downlink(&mut self, txpk: Option<TxPk>, mac: MacAddress) -> Downlink {
-        // assign random token
-        let random_token = rand::thread_rng().gen();
-
-        let packet = if let Some(txpk) = txpk {
-            // create pull_resp frame with the data
-            Some(pull_resp::Packet {
-                random_token,
-                data: pull_resp::Data::from_txpk(txpk),
-            })
-        } else {
-            None
-        };
+        let packet = txpk.map(|txpk| pull_resp::Packet {
+            random_token: rand::thread_rng().gen(),
+            data: pull_resp::Data::from_txpk(txpk),
+        });
 
         Downlink {
-            random_token,
             mac,
             packet,
             sender: self.get_sender(),
@@ -239,8 +229,9 @@ impl UdpRuntime {
 
 impl UdpRx {
     pub async fn run(self) -> Result {
-        let mut buf = vec![0u8; 1024];
         loop {
+            let mut buf = vec![0u8; 1024];
+
             match self.socket_receiver.recv_from(&mut buf).await {
                 Err(e) => return Err(e.into()),
                 Ok((n, src)) => {
@@ -254,15 +245,15 @@ impl UdpRx {
                             .await?;
                         None
                     };
-
                     if let Some(packet) = packet {
                         match packet {
                             Packet::Up(packet) => {
-                                // echo all packets to client
+                                eprintln!("Received {:?}", packet);
+
+                                //echo all packets to client
                                 self.internal_sender
                                     .send(InternalEvent::RawPacket(packet.clone()))
                                     .await?;
-
                                 match packet {
                                     Up::PullData(pull_data) => {
                                         let mac = pull_data.gateway_mac;
@@ -350,6 +341,7 @@ impl Internal {
                             // We receive an error here if we are trying to send the packet to a
                             // client that is no longer connected to us. Delete the client from map
                             if self.socket_sender.send_to(&buf[..n], addr).await.is_err() {
+                                warn!("Client {} not connected", mac);
                                 self.clients.remove(&mac);
                             } else {
                                 // store token and one-shot channel
@@ -368,7 +360,10 @@ impl Internal {
                         if let Some(sender) = self.downlink_senders.remove(&txack.random_token) {
                             sender.send(txack).map_err(|_| Error::AckSend)?;
                         } else {
-                            eprintln!("ACK received for unknown random_token")
+                            warn!(
+                                "ACK received for unknown random_token {}",
+                                txack.random_token
+                            )
                         }
                     }
                     InternalEvent::PacketBySocket((packet, addr)) => {
