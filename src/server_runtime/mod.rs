@@ -247,7 +247,7 @@ impl UdpRx {
                     if let Some(packet) = packet {
                         match packet {
                             Packet::Up(packet) => {
-                                //echo all packets to client
+                                // echo all packets to client
                                 self.internal_sender
                                     .send(InternalEvent::RawPacket(packet.clone()))
                                     .await?;
