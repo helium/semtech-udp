@@ -229,9 +229,8 @@ impl UdpRuntime {
 
 impl UdpRx {
     pub async fn run(self) -> Result {
+        let mut buf = vec![0u8; 1024];
         loop {
-            let mut buf = vec![0u8; 1024];
-
             match self.socket_receiver.recv_from(&mut buf).await {
                 Err(e) => return Err(e.into()),
                 Ok((n, src)) => {
