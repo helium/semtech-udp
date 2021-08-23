@@ -62,7 +62,7 @@ pub mod data_rate {
             D: Deserializer<'de>,
         {
             let s = <&str>::deserialize(deserializer)?;
-            DataRate::from_str(&s).map_err(de::Error::custom)
+            DataRate::from_str(s).map_err(de::Error::custom)
         }
     }
 

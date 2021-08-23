@@ -42,6 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match msg {
             semtech_udp::Packet::Down(down) => {
                 if let semtech_udp::Down::PullResp(packet) = down {
+                    // it is the client's responsibility to ack the tx request
                     let ack =
                         (*packet).into_ack_for_gateway(semtech_udp::MacAddress::new(&mac_address));
                     sender.send(ack.into()).await?;
@@ -53,10 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(
-    name = "Semtech GWMP over UDP Client Example",
-    about = "LoRaWAN test device utility"
-)]
+#[structopt(name = "Semtech GWMP over UDP Client Example")]
 pub struct Opt {
     /// dial out port
     #[structopt(short, long, default_value = "1600")]

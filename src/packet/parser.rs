@@ -70,7 +70,7 @@ impl Parser for Packet {
                     Identifier::PushAck => push_ack::Packet { random_token }.into(),
                     Identifier::PullAck => pull_ack::Packet { random_token }.into(),
                     Identifier::PullResp => {
-                        let json_str = std::str::from_utf8(&buffer)?;
+                        let json_str = std::str::from_utf8(buffer)?;
                         let data = serde_json::from_str(json_str)?;
                         pull_resp::Packet { random_token, data }.into()
                     }

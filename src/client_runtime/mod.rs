@@ -4,6 +4,7 @@
    receive downlink packets and send uplink packets easily
 */
 use crate::{parser::Parser, pull_data, Down, MacAddress, Packet, SerializablePacket, Up};
+use log::warn;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::UdpSocket;
@@ -21,7 +22,6 @@ pub type TxMessage = Packet;
 
 pub struct UdpRuntimeRx {
     sender: broadcast::Sender<RxMessage>,
-    udp_sender: Sender<TxMessage>,
     socket_recv: Arc<UdpSocket>,
 }
 
@@ -97,7 +97,6 @@ impl UdpRuntime {
         Ok(UdpRuntime {
             rx: UdpRuntimeRx {
                 sender: rx_sender,
-                udp_sender: tx_sender.clone(),
                 socket_recv,
             },
             poll_sender: tx_sender.clone(),
@@ -128,8 +127,6 @@ impl UdpRuntimeRx {
                                     Down::PullResp(pull_resp) => {
                                         // send downlinks to LoRaWAN layer
                                         self.sender.send(pull_resp.clone().into()).unwrap();
-                                        // provide ACK
-                                        self.udp_sender.send(pull_resp.into_ack().into()).await?;
                                     }
                                     Down::PullAck(_) | Down::PushAck(_) => {
                                         // send downlinks to LoRaWAN layer
@@ -138,12 +135,12 @@ impl UdpRuntimeRx {
                                 },
                             }
                         }
-                        // tolerate bad frames. TODO: logging
-                        Err(_) => (),
+                        // tolerate bad frames
+                        Err(_) => warn!("Unable to parse UDP frame: {:?}", &buf[0..n]),
                     }
                 }
                 Err(e) => {
-                    println!("Socket receive error: {}", e);
+                    warn!("Socket receive error: {}", e);
                     // back off of CPU
                     sleep(Duration::from_secs(10)).await;
                 }
@@ -176,9 +173,8 @@ impl UdpRuntimeTx {
                 }
 
                 let n = data.serialize(&mut buf)? as usize;
-
                 if let Err(e) = self.socket_send.send(&buf[..n]).await {
-                    println!("Socket error: {}", e);
+                    warn!("Socket error: {}", e);
                     // back off of CPU
                     sleep(Duration::from_secs(10)).await;
                 }

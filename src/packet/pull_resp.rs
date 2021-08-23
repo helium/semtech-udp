@@ -133,7 +133,7 @@ impl SerializablePacket for Packet {
         let mut w = Cursor::new(buffer);
         write_preamble(&mut w, self.random_token)?;
         w.write_all(&[Identifier::PullResp as u8])?;
-        w.write_all(&serde_json::to_string(&self.data)?.as_bytes())?;
+        w.write_all(serde_json::to_string(&self.data)?.as_bytes())?;
         Ok(w.position())
     }
 }
