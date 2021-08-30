@@ -119,7 +119,7 @@ fn write_preamble(w: &mut Cursor<&mut [u8]>, token: u16) -> Result {
 #[serde(untagged)]
 pub enum StringOrNum {
     S(String),
-    N(u64),
+    N(u32),
 }
 
 pub trait SerializablePacket {

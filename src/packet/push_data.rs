@@ -111,7 +111,7 @@ pub struct RxPkV1 {
     pub rssis: Option<i32>,
     pub size: u64,
     pub stat: CRC,
-    pub tmst: u64,
+    pub tmst: u32,
 }
 
 #[derive(Debug, Serialize_repr, Deserialize_repr, Clone, PartialEq)]
@@ -158,7 +158,7 @@ pub struct RxPkV2 {
     pub rsig: Vec<RSig>,
     pub size: u64,
     pub stat: CRC,
-    pub tmst: u64,
+    pub tmst: u32,
     pub delayed: Option<bool>,
     pub tmms: Option<u64>,
     pub time: Option<String>,
@@ -281,7 +281,7 @@ impl RxPk {
         get_field!(self, data)
     }
 
-    pub fn get_timestamp(&self) -> &u64 {
+    pub fn get_timestamp(&self) -> &u32 {
         get_field!(self, tmst)
     }
 
