@@ -206,7 +206,7 @@ impl fmt::Display for RxPk {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "@{} ms, {:.2} MHz, {:?}, {}, snr: {}, len: {}",
+            "@{} us, {:.2} MHz, {:?}, {}, snr: {}, len: {}",
             self.get_timestamp(),
             self.get_frequency(),
             self.get_datarate(),

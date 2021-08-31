@@ -117,7 +117,7 @@ impl fmt::Display for TxPk {
             f,
             "{}, {:.2} MHz, {:?}, len: {}",
             if let StringOrNum::N(time) = self.tmst {
-                format!("@{} ms", time)
+                format!("@{} us", time)
             } else {
                 "immediately".into()
             },
