@@ -22,8 +22,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx, rx): (Sender<MacAddress>, Receiver<MacAddress>) = oneshot::channel();
     let mut tx = Some(tx);
 
-    let debug = cli.debug;
-
     if cli.test {
         // spawn off tx thread for sending packets
         tokio::spawn(async move {
@@ -97,11 +95,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::NoClientWithMac(_packet, mac) => {
                 println!("Tried to send to client with unknown MAC: {:?}", mac)
             }
-            Event::RawPacket(pkt) => {
-                if debug {
-                    println!("RawPacket: {:?}", pkt)
-                }
-            }
         }
     }
 }
@@ -147,8 +140,4 @@ pub struct Opt {
     /// Polarization inversion (set true when sending to devices)
     #[structopt(long)]
     polarization_inversion: bool,
-
-    /// whether to provide all raw packets
-    #[structopt(long)]
-    debug: bool,
 }

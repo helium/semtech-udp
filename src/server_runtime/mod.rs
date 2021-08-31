@@ -19,7 +19,6 @@ pub type Result<T = ()> = std::result::Result<T, Error>;
 #[derive(Debug)]
 enum InternalEvent {
     Downlink((pull_resp::Packet, MacAddress, oneshot::Sender<TxAck>)),
-    RawPacket(Up),
     PacketBySocket((Packet, SocketAddr)),
     Client((MacAddress, SocketAddr)),
     PacketReceived(RxPk, MacAddress),
@@ -30,7 +29,6 @@ enum InternalEvent {
 #[derive(Debug, Clone)]
 pub enum Event {
     PacketReceived(RxPk, MacAddress),
-    RawPacket(Up),
     NewClient((MacAddress, SocketAddr)),
     UpdateClient((MacAddress, SocketAddr)),
     UnableToParseUdpFrame(Vec<u8>),
@@ -247,10 +245,6 @@ impl UdpRx {
                     if let Some(packet) = packet {
                         match packet {
                             Packet::Up(packet) => {
-                                // echo all packets to client
-                                self.internal_sender
-                                    .send(InternalEvent::RawPacket(packet.clone()))
-                                    .await?;
                                 match packet {
                                     Up::PullData(pull_data) => {
                                         let mac = pull_data.gateway_mac;
@@ -317,9 +311,6 @@ impl Internal {
             let msg = self.receiver.recv().await;
             if let Some(msg) = msg {
                 match msg {
-                    InternalEvent::RawPacket(up) => {
-                        self.client_tx_sender.send(Event::RawPacket(up)).await?;
-                    }
                     InternalEvent::UnableToParseUdpFrame(frame) => {
                         self.client_tx_sender
                             .send(Event::UnableToParseUdpFrame(frame))
