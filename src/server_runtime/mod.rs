@@ -7,7 +7,7 @@ use log::warn;
 use std::sync::Arc;
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tokio::{
-    net::UdpSocket,
+    net::{ToSocketAddrs, UdpSocket},
     sync::{mpsc, oneshot},
     time::timeout,
 };
@@ -168,7 +168,7 @@ impl UdpRuntime {
         self.rx.recv().await
     }
 
-    pub async fn new(addr: SocketAddr) -> Result<UdpRuntime> {
+    pub async fn new<A: ToSocketAddrs>(addr: A) -> Result<UdpRuntime> {
         let socket = UdpSocket::bind(&addr).await?;
         let socket_receiver = Arc::new(socket);
         let socket_sender = socket_receiver.clone();
