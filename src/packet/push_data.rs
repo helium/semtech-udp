@@ -55,6 +55,7 @@ impl Packet {
             size: 12,
             stat: CRC::OK,
             tmst: 12,
+            time: None,
         })];
 
         Packet {
@@ -112,6 +113,8 @@ pub struct RxPkV1 {
     pub size: u64,
     pub stat: CRC,
     pub tmst: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time: Option<String>,
 }
 
 #[derive(Debug, Serialize_repr, Deserialize_repr, Clone, PartialEq)]
@@ -283,6 +286,10 @@ impl RxPk {
 
     pub fn get_timestamp(&self) -> &u32 {
         get_field!(self, tmst)
+    }
+
+    pub fn get_time(&self) -> &Option<String> {
+        get_field!(self, time)
     }
 
     pub fn get_datarate(&self) -> DataRate {
