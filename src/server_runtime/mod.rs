@@ -3,7 +3,6 @@ use super::{
     SerializablePacket, Up,
 };
 pub use crate::push_data::RxPk;
-use log::warn;
 use std::sync::Arc;
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tokio::{
@@ -329,7 +328,7 @@ impl Internal {
                             // We receive an error here if we are trying to send the packet to a
                             // client that is no longer connected to us. Delete the client from map
                             if self.socket_sender.send_to(&buf[..n], addr).await.is_err() {
-                                warn!("Client {} not connected", mac);
+                                // Client not connected
                                 self.clients.remove(&mac);
                             } else {
                                 // store token and one-shot channel
@@ -347,11 +346,6 @@ impl Internal {
                     InternalEvent::AckReceived(txack) => {
                         if let Some(sender) = self.downlink_senders.remove(&txack.random_token) {
                             sender.send(txack).map_err(|_| Error::AckSend)?;
-                        } else {
-                            warn!(
-                                "ACK received for unknown random_token {}",
-                                txack.random_token
-                            )
                         }
                     }
                     InternalEvent::PacketBySocket((packet, addr)) => {

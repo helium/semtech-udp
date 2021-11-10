@@ -4,13 +4,13 @@
    receive downlink packets and send uplink packets easily
 */
 use crate::{parser::Parser, pull_data, Down, MacAddress, Packet, SerializablePacket, Up};
-use log::warn;
-use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::net::UdpSocket;
-use tokio::sync::{
-    broadcast,
-    mpsc::{self, Receiver, Sender},
+use tokio::{
+    net::{ToSocketAddrs, UdpSocket},
+    sync::{
+        broadcast,
+        mpsc::{self, Receiver, Sender},
+    },
 };
 
 mod error;
@@ -84,7 +84,11 @@ impl UdpRuntime {
         Ok(())
     }
 
-    pub async fn new(mac: [u8; 8], local: SocketAddr, host: SocketAddr) -> Result<UdpRuntime> {
+    pub async fn new<L: ToSocketAddrs, H: ToSocketAddrs>(
+        mac: [u8; 8],
+        local: L,
+        host: H,
+    ) -> Result<UdpRuntime> {
         let socket = UdpSocket::bind(&local).await?;
         // "connecting" filters for only frames from the server
         socket.connect(host).await?;
@@ -136,11 +140,10 @@ impl UdpRuntimeRx {
                             }
                         }
                         // tolerate bad frames
-                        Err(_) => warn!("Unable to parse UDP frame: {:?}", &buf[0..n]),
+                        Err(_) => (),
                     }
                 }
-                Err(e) => {
-                    warn!("Socket receive error: {}", e);
+                Err(_) => {
                     // back off of CPU
                     sleep(Duration::from_secs(10)).await;
                 }
@@ -172,8 +175,7 @@ impl UdpRuntimeTx {
                 }
 
                 let n = data.serialize(&mut buf)? as usize;
-                if let Err(e) = self.socket_send.send(&buf[..n]).await {
-                    warn!("Socket error: {}", e);
+                if let Err(_) = self.socket_send.send(&buf[..n]).await {
                     // back off of CPU
                     sleep(Duration::from_secs(10)).await;
                 }
