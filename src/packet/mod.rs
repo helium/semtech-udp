@@ -101,11 +101,23 @@ impl MacAddress {
 impl fmt::Display for MacAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MacAddress(")?;
-        for i in 0..6 {
+        for i in 0..7 {
             write!(f, "{:02X}:", self.bytes[i])?;
         }
         write!(f, "{:02X}", self.bytes[7])?;
         write!(f, ")")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_to_string_sf7() {
+        let mac_bytes = [1, 2, 3, 4, 5, 6, 7, 8];
+        let mac_address = MacAddress::new(&mac_bytes);
+        let mac_string = format!("{}", mac_address);
+        assert_eq!("MacAddress(01:02:03:04:05:06:07:08)", mac_string);
     }
 }
 
