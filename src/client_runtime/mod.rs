@@ -10,7 +10,7 @@ use tokio::{
     sync::{
         broadcast,
         mpsc::{self, Receiver, Sender},
-    }
+    },
 };
 
 mod error;
@@ -84,7 +84,11 @@ impl UdpRuntime {
         Ok(())
     }
 
-    pub async fn new<A: ToSocketAddrs>(mac: [u8; 8], local: A, host: A) -> Result<UdpRuntime> {
+    pub async fn new<L: ToSocketAddrs, H: ToSocketAddrs>(
+        mac: [u8; 8],
+        local: L,
+        host: H,
+    ) -> Result<UdpRuntime> {
         let socket = UdpSocket::bind(&local).await?;
         // "connecting" filters for only frames from the server
         socket.connect(host).await?;
