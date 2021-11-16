@@ -26,7 +26,7 @@ pub struct UdpRuntimeRx {
 }
 
 pub struct UdpRuntimeTx {
-    gateway_id: [u8; 8],
+    gateway_id: MacAddress,
     receiver: Receiver<TxMessage>,
     sender: Sender<TxMessage>,
     socket_send: Arc<UdpSocket>,
@@ -85,7 +85,7 @@ impl UdpRuntime {
     }
 
     pub async fn new<L: ToSocketAddrs, H: ToSocketAddrs>(
-        mac: [u8; 8],
+        mac: MacAddress,
         local: L,
         host: H,
     ) -> Result<UdpRuntime> {
@@ -160,7 +160,7 @@ impl UdpRuntimeTx {
             if let Some(mut data) = tx {
                 match &mut data {
                     Packet::Up(ref mut up) => {
-                        up.set_gateway_mac(MacAddress::new(&self.gateway_id));
+                        up.set_gateway_mac(MacAddress::from(self.gateway_id));
                         match up {
                             Up::PushData(ref mut push_data) => {
                                 push_data.random_token = rand::random()

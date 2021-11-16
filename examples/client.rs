@@ -1,5 +1,5 @@
 use semtech_udp::client_runtime::UdpRuntime;
-use semtech_udp::Up::PushData;
+use semtech_udp::{MacAddress, Up::PushData};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
@@ -8,7 +8,7 @@ use tokio::time::sleep;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mac_address = [0, 0, 0, 0, 4, 3, 2, 1];
+    let mac_address = MacAddress::from([0, 0, 0, 0, 4, 3, 2, 1]);
     let cli = Opt::from_args();
     let outbound = SocketAddr::from(([0, 0, 0, 0], cli.port));
     let host = SocketAddr::from_str(cli.host.as_str())?;
@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let semtech_udp::Down::PullResp(packet) = down {
                     // it is the client's responsibility to ack the tx request
                     let ack =
-                        (*packet).into_ack_for_gateway(semtech_udp::MacAddress::new(&mac_address));
+                        (*packet).into_ack_for_gateway(semtech_udp::MacAddress::from(mac_address));
                     sender.send(ack.into()).await?;
                 }
             }

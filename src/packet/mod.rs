@@ -1,7 +1,6 @@
 #![allow(clippy::upper_case_acronyms)]
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 mod types;
 pub use types::*;
@@ -9,6 +8,8 @@ pub use types::*;
 mod error;
 pub use error::{Error, ParseError};
 pub type Result<T = ()> = std::result::Result<T, Error>;
+
+pub use macaddr::MacAddr8 as MacAddress;
 
 const PROTOCOL_VERSION: u8 = 2;
 
@@ -29,6 +30,8 @@ pub mod pull_resp;
 pub mod push_ack;
 pub mod push_data;
 pub mod tx_ack;
+
+pub mod parser;
 
 #[derive(Debug, Clone)]
 pub enum Packet {
@@ -77,50 +80,6 @@ pub enum Down {
     PullResp(Box<pull_resp::Packet>),
 }
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq)]
-pub struct MacAddress {
-    bytes: [u8; 8],
-}
-
-pub mod parser;
-
-impl Eq for MacAddress {}
-
-impl MacAddress {
-    pub fn new(b: &[u8; 8]) -> MacAddress {
-        MacAddress {
-            bytes: [b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]],
-        }
-    }
-
-    pub fn bytes(&self) -> &[u8] {
-        &self.bytes
-    }
-}
-
-impl fmt::Display for MacAddress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "MacAddress(")?;
-        for i in 0..7 {
-            write!(f, "{:02X}:", self.bytes[i])?;
-        }
-        write!(f, "{:02X}", self.bytes[7])?;
-        write!(f, ")")
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_to_string_sf7() {
-        let mac_bytes = [1, 2, 3, 4, 5, 6, 7, 8];
-        let mac_address = MacAddress::new(&mac_bytes);
-        let mac_string = format!("{}", mac_address);
-        assert_eq!("MacAddress(01:02:03:04:05:06:07:08)", mac_string);
-    }
-}
-
 use std::io::{Cursor, Write};
 
 fn write_preamble(w: &mut Cursor<&mut [u8]>, token: u16) -> Result {
@@ -147,7 +106,7 @@ macro_rules! simple_up_packet {
                 let mut w = Cursor::new(buffer);
                 write_preamble(&mut w, self.random_token)?;
                 w.write_all(&[$name as u8])?;
-                w.write_all(&self.gateway_mac.bytes())?;
+                w.write_all(&self.gateway_mac.as_bytes())?;
                 Ok(w.position())
             }
         }

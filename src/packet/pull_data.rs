@@ -34,7 +34,7 @@ impl Default for Packet {
     fn default() -> Packet {
         Packet {
             random_token: 0,
-            gateway_mac: MacAddress { bytes: [0; 8] },
+            gateway_mac: MacAddress::from([0; 8]),
         }
     }
 }
@@ -51,7 +51,7 @@ impl Packet {
     pub fn new(random_token: u16) -> Packet {
         Packet {
             random_token,
-            gateway_mac: MacAddress { bytes: [0; 8] },
+            gateway_mac: MacAddress::from([0; 8]),
         }
     }
 

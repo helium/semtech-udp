@@ -27,6 +27,7 @@ required-features = ["client", "server"]
 [dependencies]
 arrayref = "0"
 base64 = "0"
+macaddr = "1"
 num_enum = "0"
 rand = "0"
 serde = { version = "1", default-features = false,  features = ["derive"] }

@@ -32,7 +32,7 @@ impl Packet {
         let rxpk = vec![rxpk];
         Packet {
             random_token: 0,
-            gateway_mac: MacAddress { bytes: [0; 8] },
+            gateway_mac: MacAddress::from([0; 8]),
             data: Data {
                 rxpk: Some(rxpk),
                 stat: None,
@@ -60,7 +60,7 @@ impl Packet {
 
         Packet {
             random_token: rand::random(),
-            gateway_mac: MacAddress { bytes: [0; 8] },
+            gateway_mac: MacAddress::from([0; 8]),
             data: Data {
                 rxpk: Some(rxpk),
                 stat: None,
@@ -340,7 +340,7 @@ impl SerializablePacket for Packet {
         let mut w = Cursor::new(buffer);
         write_preamble(&mut w, self.random_token)?;
         w.write_all(&[Identifier::PushData as u8])?;
-        w.write_all(self.gateway_mac.bytes())?;
+        w.write_all(self.gateway_mac.as_bytes())?;
         w.write_all(serde_json::to_string(&self.data)?.as_bytes())?;
         Ok(w.position())
     }
