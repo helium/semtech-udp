@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate arrayref;
-
 mod packet;
 pub use packet::*;
 

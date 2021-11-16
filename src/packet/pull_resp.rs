@@ -46,12 +46,12 @@ impl Packet {
 
     // sets a default Gateway value
     pub fn into_nack_with_error(self, e: super::tx_ack::Error) -> tx_ack::Packet {
-        self.into_nack_with_error_for_gateway(e, MacAddress { bytes: [0; 8] })
+        self.into_nack_with_error_for_gateway(e, MacAddress::from([0; 8]))
     }
 
     // sets a default Gateway value
     pub fn into_ack(self) -> tx_ack::Packet {
-        self.into_ack_for_gateway(MacAddress { bytes: [0; 8] })
+        self.into_ack_for_gateway(MacAddress::from([0; 8]))
     }
 }
 

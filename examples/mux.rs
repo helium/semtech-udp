@@ -83,15 +83,7 @@ async fn client_instance(
         host,
         outbound.port()
     );
-    let bytes = mac_address.bytes();
-    let udp_runtime = client_runtime::UdpRuntime::new(
-        [
-            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-        ],
-        outbound,
-        host,
-    )
-    .await?;
+    let udp_runtime = client_runtime::UdpRuntime::new(mac_address, outbound, host).await?;
 
     let (mut receiver, sender) = (udp_runtime.subscribe(), udp_runtime.publish_to());
 
