@@ -104,23 +104,30 @@ async fn client_instance(
                         let prepared_send = client_tx.prepare_downlink(Some(txpk), mac_address);
                         let sender = sender.clone();
                         tokio::spawn(async move {
-                            let packet =
-                                match prepared_send.dispatch(Some(Duration::from_secs(5))).await {
-                                    Err(Error::Ack(e)) => Some(
-                                        (*packet).into_nack_with_error_for_gateway(e, mac_address),
-                                    ),
-                                    Err(Error::SendTimeout) => {
-                                        Some((*packet).into_nack_with_error_for_gateway(
-                                            tx_ack::Error::SendFail,
-                                            mac_address,
-                                        ))
-                                    }
-                                    Ok(()) => Some((*packet).into_ack_for_gateway(mac_address)),
-                                    Err(e) => {
-                                        println!("Unhandle downlink error: {:?}", e);
-                                        None
-                                    }
-                                };
+                            let packet = match prepared_send
+                                .dispatch(Some(Duration::from_secs(5)))
+                                .await
+                            {
+                                Err(Error::Ack(e)) => {
+                                    println!("Error Downlinking: {:?}", e);
+                                    Some((*packet).into_nack_with_error_for_gateway(e, mac_address))
+                                }
+                                Err(Error::SendTimeout) => {
+                                    println!("Gateway did not ACK or NACK. Packet forward may not be connected?");
+                                    Some((*packet).into_nack_with_error_for_gateway(
+                                        tx_ack::Error::SendFail,
+                                        mac_address,
+                                    ))
+                                }
+                                Ok(()) => {
+                                    println!("Downlink successful");
+                                    Some((*packet).into_ack_for_gateway(mac_address))
+                                }
+                                Err(e) => {
+                                    println!("Unhandled downlink error: {:?}", e);
+                                    None
+                                }
+                            };
                             if let Some(packet) = packet {
                                 sender.send(packet.into()).await.unwrap();
                             }
