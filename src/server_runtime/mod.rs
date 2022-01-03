@@ -40,8 +40,6 @@ pub enum Event {
 #[allow(dead_code)]
 pub struct ClientTx {
     sender: mpsc::Sender<InternalEvent>,
-    // you need to subscribe to the send channel
-    receiver_copier: mpsc::Sender<Event>,
 }
 
 // sends packets to clients
@@ -178,7 +176,6 @@ impl UdpRuntime {
 
         let client_tx = ClientTx {
             sender: udp_tx_sender.clone(),
-            receiver_copier: client_tx_sender.clone(),
         };
 
         let client_rx = ClientRx {
