@@ -37,6 +37,7 @@ pub enum Event {
 // receives requests from clients
 // dispatches them to UdpTx
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ClientTx {
     sender: mpsc::Sender<InternalEvent>,
     // you need to subscribe to the send channel
