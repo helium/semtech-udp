@@ -37,6 +37,7 @@ pub enum Event {
 // receives requests from clients
 // dispatches them to UdpTx
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ClientTx {
     sender: mpsc::Sender<InternalEvent>,
     // you need to subscribe to the send channel
@@ -169,6 +170,7 @@ impl UdpRuntime {
 
     pub async fn new<A: ToSocketAddrs>(addr: A) -> Result<UdpRuntime> {
         let socket = UdpSocket::bind(&addr).await?;
+        println!("{:?}", socket);
         let socket_receiver = Arc::new(socket);
         let socket_sender = socket_receiver.clone();
 
@@ -242,6 +244,8 @@ impl UdpRx {
                         None
                     };
                     if let Some(packet) = packet {
+                        println!("{:?}", packet);
+
                         match packet {
                             Packet::Up(packet) => {
                                 match packet {
