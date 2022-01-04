@@ -21,7 +21,7 @@ name = "client"
 required-features = ["client"]
 
 [[example]]
-name = "mux"
+name = "gwmp-mux"
 required-features = ["client", "server"]
 
 [dependencies]
