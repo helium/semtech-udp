@@ -67,7 +67,7 @@ pub struct Opt {
     pub host: u16,
     /// addresses to be clients to (eg: 127.0.0.1:1680)
     /// WARNING: all addresses will receive all ACKs for transmits
-    #[structopt(long, default_value = "1680")]
+    #[structopt(long, default_value = "127.0.0.1:1680")]
     pub client: Vec<String>,
 }
 
