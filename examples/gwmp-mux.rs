@@ -22,12 +22,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Ready for clients");
     loop {
         match client_rx.recv().await {
-            Event::UnableToParseUdpFrame(buf) => {
-                println!("Semtech UDP Parsing Error");
-                println!("UDP data: {:?}", buf);
+            Event::UnableToParseUdpFrame(error, buf) => {
+                println!("Semtech UDP Parsing Error: {error}");
+                println!("UDP data: {buf:?}");
             }
             Event::NewClient((mac, addr)) => {
-                println!("New packet forwarder client: {}, {}", mac, addr);
+                println!("New packet forwarder client: {mac}, {addr}");
 
                 let mut clients = Vec::new();
                 for port in &cli.client {
@@ -39,10 +39,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 mux.insert(mac, clients);
             }
             Event::UpdateClient((mac, addr)) => {
-                println!("Mac existed, but IP updated: {}, {}", mac, addr);
+                println!("Mac existed, but IP updated: {mac}, {addr}");
             }
             Event::PacketReceived(rxpk, gateway_mac) => {
-                println!("Uplink Received {:?}", rxpk);
+                println!("Uplink Received {rxpk:?}");
                 if let Some(clients) = mux.get_mut(&gateway_mac) {
                     for sender in clients {
                         println!("Forwarding Uplink");
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             Event::NoClientWithMac(_packet, mac) => {
-                println!("Tried to send to client with unknown MAC: {:?}", mac)
+                println!("Tried to send to client with unknown MAC: {mac:?}")
             }
         }
     }

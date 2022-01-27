@@ -17,15 +17,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         println!("Waiting for event");
         match udp_runtime.recv().await {
-            Event::UnableToParseUdpFrame(buf) => {
-                println!("Semtech UDP Parsing Error");
-                println!("UDP data: {:?}", buf);
+            Event::UnableToParseUdpFrame(error, buf) => {
+                println!("Semtech UDP Parsing Error: {error}");
+                println!("UDP data: {buf:?}");
             }
             Event::NewClient((mac, addr)) => {
-                println!("New packet forwarder client: {}, {}", mac, addr);
+                println!("New packet forwarder client: {mac}, {addr}");
             }
             Event::UpdateClient((mac, addr)) => {
-                println!("Mac existed, but IP updated: {}, {}", mac, addr);
+                println!("Mac existed, but IP updated: {mac}, {addr}");
             }
             Event::PacketReceived(rxpk, gateway_mac) => {
                 println!("{:?}", rxpk);
@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 });
             }
             Event::NoClientWithMac(_packet, mac) => {
-                println!("Tried to send to client with unknown MAC: {:?}", mac)
+                println!("Tried to send to client with unknown MAC: {mac:?}")
             }
         }
     }

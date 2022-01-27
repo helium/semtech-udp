@@ -18,12 +18,10 @@ pub enum ParseError {
     InvalidIdentifier,
     #[error("utf8 error")]
     Utf8(#[from] std::str::Utf8Error),
-    #[error("unable to parse GWMP JSON")]
-    Json,
-}
-
-impl From<serde_json::error::Error> for ParseError {
-    fn from(_: serde_json::error::Error) -> ParseError {
-        ParseError::Json
-    }
+    #[error("invalid Json string for {identifier} frame: {json_str}. JsonError: {json_error}")]
+    InvalidJson {
+        identifier: crate::Identifier,
+        json_str: String,
+        json_error: serde_json::Error,
+    },
 }
