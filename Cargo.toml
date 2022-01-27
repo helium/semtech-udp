@@ -5,7 +5,7 @@ authors = ["Louis Thiery <thiery.louis@gmail.com>"]
 edition = "2021"
 description = "Semtech UDP provides serialization and deserialization of packets complying with the Semtech UDP protocol"
 license = "Apache-2.0"
-keywords = ["lorawan", "iot", "lpwan", "semtech"]
+keywords = ["lorawan", "iot", "lpwan", "semtech", "gwmp"]
 repository = "https://github.com/helium/semtech-udp/"
 
 [[example]]
@@ -33,7 +33,7 @@ rand = "0"
 serde = { version = "1", default-features = false,  features = ["derive"] }
 serde_json = "1"
 serde_repr = "0"
-tokio = { version = "1", optional = true, features = ["rt", "net"]}
+tokio = { version = "1", optional = true, features = ["rt", "net", "sync", "time"]}
 thiserror = "1"
 
 [dev-dependencies]
