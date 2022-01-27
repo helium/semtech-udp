@@ -44,8 +44,13 @@ impl Parser for Packet {
                     Identifier::PushData => {
                         let gateway_mac = gateway_mac(&buffer[..PACKET_PAYLOAD_START]);
                         let json_str = std::str::from_utf8(&buffer[PACKET_PAYLOAD_START..])?;
-                        let data = serde_json::from_str(json_str)?;
-
+                        let data = serde_json::from_str(json_str).map_err(|json_error| {
+                            ParseError::InvalidJson {
+                                identifier: id,
+                                json_str: json_str.into(),
+                                json_error,
+                            }
+                        })?;
                         push_data::Packet {
                             random_token,
                             gateway_mac,
@@ -57,7 +62,13 @@ impl Parser for Packet {
                         let gateway_mac = gateway_mac(&buffer[..PACKET_PAYLOAD_START]);
                         let data = if buffer.len() > PACKET_PAYLOAD_START {
                             let json_str = std::str::from_utf8(&buffer[PACKET_PAYLOAD_START..])?;
-                            serde_json::from_str(json_str)?
+                            serde_json::from_str(json_str).map_err(|json_error| {
+                                ParseError::InvalidJson {
+                                    identifier: id,
+                                    json_str: json_str.into(),
+                                    json_error,
+                                }
+                            })?
                         } else {
                             TxPkNack::default()
                         };
@@ -73,7 +84,13 @@ impl Parser for Packet {
                     Identifier::PullAck => pull_ack::Packet { random_token }.into(),
                     Identifier::PullResp => {
                         let json_str = std::str::from_utf8(buffer)?;
-                        let data = serde_json::from_str(json_str)?;
+                        let data = serde_json::from_str(json_str).map_err(|json_error| {
+                            ParseError::InvalidJson {
+                                identifier: id,
+                                json_str: json_str.into(),
+                                json_error,
+                            }
+                        })?;
                         pull_resp::Packet { random_token, data }.into()
                     }
                 })

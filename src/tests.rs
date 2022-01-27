@@ -194,3 +194,31 @@ fn push_data_stat_null_ackr() {
     // the unwrap is enough for the test here
     let _packet = Packet::parse(&recv).unwrap();
 }
+
+#[test]
+fn new_parsing_error() {
+    let recv = [
+        2, 0, 0, 0, 0, 0, 0, 0, 222, 173, 190, 239, 123, 34, 115, 116, 97, 116, 34, 58, 123, 34,
+        108, 97, 116, 105, 34, 58, 52, 56, 46, 51, 50, 48, 57, 50, 55, 50, 48, 54, 55, 52, 49, 53,
+        52, 44, 34, 108, 111, 110, 103, 34, 58, 50, 46, 57, 49, 49, 49, 56, 52, 56, 55, 49, 52, 53,
+        50, 55, 49, 49, 56, 125, 125,
+    ];
+
+    // the unwrap is enough for the test here
+    if let Err(e) = Packet::parse(&recv) {
+        if let ParseError::InvalidJson {
+            identifier,
+            json_str,
+            ..
+        } = e
+        {
+            assert_eq!(identifier, Identifier::PushData);
+            assert_eq!(
+                json_str,
+                "{\"stat\":{\"lati\":48.32092720674154,\"long\":2.9111848714527118}}"
+            );
+        }
+    } else {
+        assert!(false)
+    }
+}

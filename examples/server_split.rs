@@ -12,7 +12,7 @@ use tokio::time::{sleep, Duration};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Opt::from_args();
     let addr = SocketAddr::from(([0, 0, 0, 0], cli.port));
-    println!("Starting server: {}", addr);
+    println!("Starting server: {addr}");
 
     // Splitting is optional and only useful if you are want to run concurrently
     // the client_rx & client_tx can both be held inside the UdpRuntime struct
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 tokio::spawn(async move {
                     if let Err(e) = prepared_send.dispatch(Some(Duration::from_secs(5))).await {
-                        println!("Transmit Dispatch threw error: {:?}", e)
+                        println!("Transmit Dispatch threw error: {e:?}")
                     } else {
                         println!("Send complete");
                     }
@@ -72,9 +72,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Ready for clients");
     loop {
         match client_rx.recv().await {
-            Event::UnableToParseUdpFrame(buf) => {
-                println!("Semtech UDP Parsing Error");
-                println!("UDP data: {:?}", buf);
+            Event::UnableToParseUdpFrame(error, buf) => {
+                println!("Semtech UDP Parsing Error: {error}");
+                println!("UDP data: {buf:?}");
             }
             Event::NewClient((mac, addr)) => {
                 println!("New packet forwarder client: {}, {}", mac, addr);
@@ -89,8 +89,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("Mac existed, but IP updated: {}, {}", mac, addr);
             }
             Event::PacketReceived(rxpk, addr) => {
-                println!("Packet Receveived from {}:", addr);
-                println!("\t{:?}", rxpk);
+                println!("Packet Receveived from {addr}:");
+                println!("\t{rxpk:?}");
             }
             Event::NoClientWithMac(_packet, mac) => {
                 println!("Tried to send to client with unknown MAC: {:?}", mac)

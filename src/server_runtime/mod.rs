@@ -1,6 +1,6 @@
 use super::{
     parser::Parser, pull_resp, pull_resp::TxPk, tx_ack::Packet as TxAck, MacAddress, Packet,
-    SerializablePacket, Up,
+    ParseError, SerializablePacket, Up,
 };
 pub use crate::push_data::RxPk;
 use std::sync::Arc;
@@ -21,16 +21,16 @@ enum InternalEvent {
     PacketBySocket((Packet, SocketAddr)),
     Client((MacAddress, SocketAddr)),
     PacketReceived(RxPk, MacAddress),
-    UnableToParseUdpFrame(Vec<u8>),
+    UnableToParseUdpFrame(ParseError, Vec<u8>),
     AckReceived(TxAck),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Event {
     PacketReceived(RxPk, MacAddress),
     NewClient((MacAddress, SocketAddr)),
     UpdateClient((MacAddress, SocketAddr)),
-    UnableToParseUdpFrame(Vec<u8>),
+    UnableToParseUdpFrame(ParseError, Vec<u8>),
     NoClientWithMac(Box<pull_resp::Packet>, MacAddress),
 }
 
@@ -229,15 +229,16 @@ impl UdpRx {
             match self.socket_receiver.recv_from(&mut buf).await {
                 Err(e) => return Err(e.into()),
                 Ok((n, src)) => {
-                    let packet = if let Ok(packet) = Packet::parse(&buf[0..n]) {
-                        Some(packet)
-                    } else {
-                        let mut vec = Vec::new();
-                        vec.extend_from_slice(&buf[0..n]);
-                        self.internal_sender
-                            .send(InternalEvent::UnableToParseUdpFrame(vec))
-                            .await?;
-                        None
+                    let packet = match Packet::parse(&buf[0..n]) {
+                        Ok(packet) => Some(packet),
+                        Err(e) => {
+                            let mut vec = Vec::new();
+                            vec.extend_from_slice(&buf[0..n]);
+                            self.internal_sender
+                                .send(InternalEvent::UnableToParseUdpFrame(e, vec))
+                                .await?;
+                            None
+                        }
                     };
                     if let Some(packet) = packet {
                         match packet {
@@ -308,9 +309,9 @@ impl Internal {
             let msg = self.receiver.recv().await;
             if let Some(msg) = msg {
                 match msg {
-                    InternalEvent::UnableToParseUdpFrame(frame) => {
+                    InternalEvent::UnableToParseUdpFrame(error, frame) => {
                         self.client_tx_sender
-                            .send(Event::UnableToParseUdpFrame(frame))
+                            .send(Event::UnableToParseUdpFrame(error, frame))
                             .await?;
                     }
                     InternalEvent::PacketReceived(rxpk, mac) => {

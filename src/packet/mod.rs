@@ -1,6 +1,7 @@
 #![allow(clippy::upper_case_acronyms)]
 use num_enum::TryFromPrimitive;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 mod types;
 pub use types::*;
@@ -22,6 +23,12 @@ pub enum Identifier {
     PullResp = 3,
     PullAck = 4,
     TxAck = 5,
+}
+
+impl fmt::Display for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 pub mod pull_ack;
