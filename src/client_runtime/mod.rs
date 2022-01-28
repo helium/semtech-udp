@@ -89,9 +89,14 @@ impl UdpRuntime {
         local: L,
         host: H,
     ) -> Result<UdpRuntime> {
-        let socket = UdpSocket::bind(&local).await?;
+        let socket = UdpSocket::bind(&local)
+            .await
+            .map_err(|io_error| Error::Binding { io_error })?;
         // "connecting" filters for only frames from the server
-        socket.connect(host).await?;
+        socket
+            .connect(host)
+            .await
+            .map_err(|io_error| Error::Binding { io_error })?;
         let socket_recv = Arc::new(socket);
         let socket_send = socket_recv.clone();
 

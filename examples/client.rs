@@ -10,7 +10,7 @@ use tokio::time::sleep;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mac_address = MacAddress::from([0, 0, 0, 0, 4, 3, 2, 1]);
     let cli = Opt::from_args();
-    let outbound = SocketAddr::from(([0, 0, 0, 0], cli.port));
+    let outbound = SocketAddr::from(([0, 0, 0, 0], 0));
     let host = SocketAddr::from_str(cli.host.as_str())?;
     println!("Connecting to server {} from port {}", cli.host, cli.port);
     let udp_runtime = UdpRuntime::new(mac_address.clone(), outbound, host).await?;
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[structopt(name = "Semtech GWMP over UDP Client Example")]
 pub struct Opt {
     /// dial out port
-    #[structopt(short, long, default_value = "1600")]
+    #[structopt(short, long, default_value = "0")]
     pub port: u16,
     #[structopt(short, long, default_value = "127.0.0.1:1680")]
     pub host: String,

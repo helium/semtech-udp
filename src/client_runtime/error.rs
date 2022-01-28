@@ -7,6 +7,8 @@ pub enum Error {
     SemtechUdp(#[from] crate::packet::Error),
     #[error("tokio::mpsc send error")]
     SendError(#[from] mpsc::error::SendError<super::TxMessage>),
-    #[error("std::io::Error")]
-    IoError(#[from] std::io::Error),
+    #[error("Error binding: {io_error}")]
+    Binding { io_error: std::io::Error },
+    #[error("Error connecting: {io_error}")]
+    Connection { io_error: std::io::Error },
 }
