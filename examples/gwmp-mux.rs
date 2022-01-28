@@ -30,7 +30,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut clients = Vec::new();
                 for address in &cli.client {
                     match client_instance(client_tx.clone(), mac.clone(), address.clone()).await {
-                        Ok(client) => clients.push(client),
+                        Ok(client) => {
+                            println!("Connected to client {address}");
+                            clients.push(client)
+                        }
                         Err(e) => println!("Error creating client: {}", e),
                     }
                 }
