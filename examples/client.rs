@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Opt::from_args();
     let outbound = SocketAddr::from(([0, 0, 0, 0], 0));
     let host = SocketAddr::from_str(cli.host.as_str())?;
-    println!("Connecting to server {} from port {}", cli.host, cli.port);
+    println!("Connecting to server {} from port {}", cli.host, outbound);
     let udp_runtime = UdpRuntime::new(mac_address.clone(), outbound, host).await?;
 
     let (mut receiver, sender) = (udp_runtime.subscribe(), udp_runtime.publish_to());
@@ -56,9 +56,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[derive(Debug, StructOpt)]
 #[structopt(name = "Semtech GWMP over UDP Client Example")]
 pub struct Opt {
-    /// dial out port
-    #[structopt(short, long, default_value = "0")]
-    pub port: u16,
     #[structopt(short, long, default_value = "127.0.0.1:1680")]
     pub host: String,
 }
