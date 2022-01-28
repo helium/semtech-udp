@@ -5,7 +5,6 @@ use semtech_udp::{
 };
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::str::FromStr;
 use std::time::Duration;
 use structopt::StructOpt;
 
@@ -28,14 +27,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Event::NewClient((mac, addr)) => {
                 println!("New packet forwarder client: {mac}, {addr}");
-
                 let mut clients = Vec::new();
-                for port in &cli.client {
-                    println!("Port {}", port);
-                    clients
-                        .push(client_instance(client_tx.clone(), mac.clone(), port.clone()).await?);
+                for address in &cli.client {
+                    match client_instance(client_tx.clone(), mac.clone(), address.clone()).await {
+                        Ok(client) => clients.push(client),
+                        Err(e) => println!("Error creating client: {}", e),
+                    }
                 }
-
                 mux.insert(mac, clients);
             }
             Event::UpdateClient((mac, addr)) => {
@@ -76,8 +74,7 @@ async fn client_instance(
     mac_address: MacAddress,
     host: String,
 ) -> Result<tokio::sync::mpsc::Sender<semtech_udp::Packet>, Box<dyn std::error::Error>> {
-    let outbound = SocketAddr::from(([127, 0, 0, 1], 0));
-    let host = SocketAddr::from_str(&host)?;
+    let outbound = SocketAddr::from(([0, 0, 0, 0], 0));
     println!(
         "Connecting to server {} from port {}",
         host,
