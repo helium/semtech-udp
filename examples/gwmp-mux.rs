@@ -3,8 +3,11 @@ use semtech_udp::{
     server_runtime::{self, Error, Event, UdpRuntime},
     tx_ack, MacAddress,
 };
+use slog::{self, debug, error, info, o, warn, Drain, Logger};
 use std::collections::HashMap;
+use std::io;
 use std::net::SocketAddr;
+use std::str::FromStr;
 use std::time::Duration;
 use structopt::StructOpt;
 
@@ -14,39 +17,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from(([0, 0, 0, 0], cli.host));
     let (mut client_rx, client_tx) = UdpRuntime::new(addr).await?.split();
 
-    println!("Starting server: {}", addr);
+    let logger = mk_logger(cli.log_level, cli.disable_timestamp);
+    let _scope_guard = slog_scope::set_global_logger(logger);
+    let logger = slog_scope::logger().new(o!());
+    let _log_guard = slog_stdlog::init().unwrap();
 
+    info!(&logger, "Starting server: {addr}");
     let mut mux = HashMap::new();
 
-    println!("Ready for clients");
+    info!(&logger, "Ready for clients");
+
     loop {
         match client_rx.recv().await {
             Event::UnableToParseUdpFrame(error, buf) => {
-                println!("Semtech UDP Parsing Error: {error}");
-                println!("UDP data: {buf:?}");
+                error!(&logger, "Semtech UDP Parsing Error: {error}");
+                error!(&logger, "UDP data: {buf:?}");
             }
             Event::NewClient((mac, addr)) => {
-                println!("New packet forwarder client: {mac}, {addr}");
+                info!(&logger, "New packet forwarder client: {mac}, {addr}");
                 let mut clients = Vec::new();
                 for address in &cli.client {
-                    match client_instance(client_tx.clone(), mac.clone(), address.clone()).await {
+                    let client_instance_logger = slog_scope::logger().new(o!());
+                    match client_instance(
+                        client_tx.clone(),
+                        client_instance_logger,
+                        mac.clone(),
+                        address.clone(),
+                    )
+                    .await
+                    {
                         Ok(client) => {
-                            println!("Connected to client {address}");
+                            info!(&logger, "Connected to client {address}");
                             clients.push(client)
                         }
-                        Err(e) => println!("Error creating client: {}", e),
+                        Err(e) => error!(&logger, "Error creating client: {}", e),
                     }
                 }
                 mux.insert(mac, clients);
             }
             Event::UpdateClient((mac, addr)) => {
-                println!("Mac existed, but IP updated: {mac}, {addr}");
+                info!(&logger, "Mac existed, but IP updated: {mac}, {addr}");
             }
             Event::PacketReceived(rxpk, gateway_mac) => {
-                println!("Uplink Received {rxpk:?}");
+                info!(&logger, "Uplink Received {rxpk:?}");
                 if let Some(clients) = mux.get_mut(&gateway_mac) {
                     for sender in clients {
-                        println!("Forwarding Uplink");
+                        debug!(&logger, "Forwarding Uplink");
                         let mut packet = push_data::Packet::from_rxpk(rxpk.clone());
                         packet.gateway_mac = gateway_mac;
                         sender.send(packet.into()).await?;
@@ -54,14 +70,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             Event::NoClientWithMac(_packet, mac) => {
-                println!("Tried to send to client with unknown MAC: {mac:?}")
+                warn!(&logger, "Downlink sent but unknown mac: {mac:?}");
             }
         }
     }
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "lora-mux", about = "Semtech GWMP over UDP Mux")]
+#[structopt(name = "gwmp-mux", about = "Multiplexer for Semtech GWMP over UDP")]
 pub struct Opt {
     /// port to host the service on
     #[structopt(long, default_value = "1681")]
@@ -70,20 +86,29 @@ pub struct Opt {
     /// WARNING: all addresses will receive all ACKs for transmits
     #[structopt(long, default_value = "127.0.0.1:1680")]
     pub client: Vec<String>,
+
+    /// Log level to show (default info)
+    #[structopt(parse(from_str = parse_log), default_value = "info")]
+    pub log_level: slog::Level,
+
+    #[structopt(long)]
+    pub disable_timestamp: bool,
 }
 
 async fn client_instance(
     mut client_tx: server_runtime::ClientTx,
+    logger: slog::Logger,
     mac_address: MacAddress,
     host: String,
 ) -> Result<tokio::sync::mpsc::Sender<semtech_udp::Packet>, Box<dyn std::error::Error>> {
     let outbound = SocketAddr::from(([0, 0, 0, 0], 0));
-    println!(
-        "Connecting to server {} from port {}",
-        host,
+    let socket = SocketAddr::from_str(&host)?;
+    info!(
+        &logger,
+        "Connecting to server {socket} from port {} on behalf of {mac_address}",
         outbound.port()
     );
-    let udp_runtime = client_runtime::UdpRuntime::new(mac_address, outbound, host).await?;
+    let udp_runtime = client_runtime::UdpRuntime::new(mac_address, outbound, socket).await?;
 
     let (mut receiver, sender) = (udp_runtime.subscribe(), udp_runtime.publish_to());
 
@@ -95,36 +120,39 @@ async fn client_instance(
     tokio::spawn(async move {
         loop {
             let msg = receiver.recv().await.unwrap();
-            println!("Received from miner {:?}", msg);
             match msg {
                 semtech_udp::Packet::Down(down) => {
                     if let semtech_udp::Down::PullResp(packet) = down {
-                        println!("Sending Downlink: {:?}", packet.data.txpk);
+                        info!(
+                            &logger,
+                            "Sending Downlink from {host} to {mac_address}: {:?}", packet.data.txpk
+                        );
                         let txpk = packet.data.txpk.clone();
                         let prepared_send = client_tx.prepare_downlink(Some(txpk), mac_address);
                         let sender = sender.clone();
+                        let logger = slog_scope::logger().new(o!());
                         tokio::spawn(async move {
                             let packet = match prepared_send
                                 .dispatch(Some(Duration::from_secs(5)))
                                 .await
                             {
                                 Err(Error::Ack(e)) => {
-                                    println!("Error Downlinking: {:?}", e);
+                                    error!(&logger, "Error Downlinking to {mac_address}: {:?}", e);
                                     Some((*packet).into_nack_with_error_for_gateway(e, mac_address))
                                 }
                                 Err(Error::SendTimeout) => {
-                                    println!("Gateway did not ACK or NACK. Packet forward may not be connected?");
+                                    warn!(&logger, "Gateway {mac_address} did not ACK or NACK. Packet forward may not be connected?");
                                     Some((*packet).into_nack_with_error_for_gateway(
                                         tx_ack::Error::SendFail,
                                         mac_address,
                                     ))
                                 }
                                 Ok(()) => {
-                                    println!("Downlink successful");
+                                    debug!(&logger, "Downlink to {mac_address} successful");
                                     Some((*packet).into_ack_for_gateway(mac_address))
                                 }
                                 Err(e) => {
-                                    println!("Unhandled downlink error: {:?}", e);
+                                    error!(&logger, "Unhandled downlink error: {:?}", e);
                                     None
                                 }
                             };
@@ -140,4 +168,32 @@ async fn client_instance(
     });
 
     Ok(uplink_sender)
+}
+
+/// An empty timestamp function for when timestamp should not be included in
+/// the output.
+fn timestamp_none(_io: &mut dyn io::Write) -> io::Result<()> {
+    Ok(())
+}
+
+fn mk_logger(log_level: slog::Level, disable_timestamp: bool) -> Logger {
+    let decorator = slog_term::PlainDecorator::new(io::stdout());
+    let timestamp = if !disable_timestamp {
+        slog_term::timestamp_local
+    } else {
+        timestamp_none
+    };
+    let drain = slog_term::FullFormat::new(decorator)
+        .use_custom_timestamp(timestamp)
+        .build()
+        .fuse();
+    let async_drain = slog_async::Async::new(drain)
+        .build()
+        .filter_level(log_level)
+        .fuse();
+    slog::Logger::root(async_drain, o!())
+}
+
+fn parse_log(src: &str) -> slog::Level {
+    src.parse().unwrap()
 }
