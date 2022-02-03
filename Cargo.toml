@@ -38,6 +38,12 @@ thiserror = "1"
 
 [dev-dependencies]
 structopt = { version = "0.3.2", default-features = false }
+slog = "2"
+slog-async = "2"
+slog-term = "2"
+slog-syslog = "0"
+slog-scope = "4"
+slog-stdlog = "4"
 
 [dev-dependencies.tokio]
 version = "1"
