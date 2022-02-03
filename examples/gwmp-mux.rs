@@ -7,7 +7,6 @@ use slog::{self, debug, error, info, o, warn, Drain, Logger};
 use std::collections::HashMap;
 use std::io;
 use std::net::SocketAddr;
-use std::str::FromStr;
 use std::time::Duration;
 use structopt::StructOpt;
 
