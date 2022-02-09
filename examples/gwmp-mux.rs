@@ -8,23 +8,52 @@ use std::collections::HashMap;
 use std::io;
 use std::net::SocketAddr;
 use std::str::FromStr;
-use std::time::Duration;
 use structopt::StructOpt;
+use tokio::{io::AsyncReadExt, signal, time::Duration};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let cli = Opt::from_args();
-    let addr = SocketAddr::from(([0, 0, 0, 0], cli.host));
-    let (mut client_rx, client_tx) = UdpRuntime::new(addr).await?.split();
-
     let logger = mk_logger(cli.log_level, cli.disable_timestamp);
-    let _scope_guard = slog_scope::set_global_logger(logger);
+    let scope_guard = slog_scope::set_global_logger(logger);
+    let run_logger = slog_scope::logger().new(o!());
     let logger = slog_scope::logger().new(o!());
+
     let _log_guard = slog_stdlog::init().unwrap();
 
-    info!(&logger, "Starting server: {addr}");
-    let mut mux = HashMap::new();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async move {
+        let logger = slog_scope::logger().new(o!());
+        if let Err(e) = run_host_and_mux(cli, run_logger).await {
+            error!(&logger, "Error with host: {e}");
+        }
+        watch_for_shutdown().await;
+    });
 
+    runtime.shutdown_timeout(Duration::from_secs(0));
+    info!(&logger, "Shutting down");
+    drop(scope_guard);
+}
+
+async fn watch_for_shutdown() {
+    let mut in_buf = [0u8; 64];
+    let mut stdin = tokio::io::stdin();
+    loop {
+        tokio::select!(
+                 _ = signal::ctrl_c() => return,
+                    read = stdin.read(&mut in_buf) => if let Ok(0) = read { return },
+
+        )
+    }
+}
+
+async fn run_host_and_mux(cli: Opt, logger: Logger) -> Result<(), Box<dyn std::error::Error>> {
+    let addr = SocketAddr::from(([0, 0, 0, 0], cli.host));
+    info!(&logger, "Starting server: {addr}");
+    let (mut client_rx, client_tx) = UdpRuntime::new(addr).await?.split();
+    let mut mux = HashMap::new();
     info!(&logger, "Ready for clients");
 
     loop {

@@ -47,7 +47,7 @@ slog-stdlog = "4"
 
 [dev-dependencies.tokio]
 version = "1"
-features = ["macros", "sync", "time", "rt-multi-thread"]
+features = ["macros", "sync", "time", "rt-multi-thread", "io-std", "io-util", "signal"]
 
 [features]
 default = []
