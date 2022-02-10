@@ -128,24 +128,20 @@ impl UdpRuntimeRx {
         loop {
             match self.socket_recv.recv(&mut buf).await {
                 Ok(n) => {
-                    match Packet::parse(&buf[0..n]) {
-                        Ok(packet) => {
-                            match packet {
-                                Packet::Up(_) => panic!("Should not be receiving any up packets"),
-                                Packet::Down(down) => match down.clone() {
-                                    Down::PullResp(pull_resp) => {
-                                        // send downlinks to LoRaWAN layer
-                                        self.sender.send(pull_resp.clone().into()).unwrap();
-                                    }
-                                    Down::PullAck(_) | Down::PushAck(_) => {
-                                        // send downlinks to LoRaWAN layer
-                                        self.sender.send(Packet::Down(down.clone())).unwrap();
-                                    }
-                                },
-                            }
+                    if let Ok(packet) = Packet::parse(&buf[0..n]) {
+                        match packet {
+                            Packet::Up(_) => panic!("Should not be receiving any up packets"),
+                            Packet::Down(down) => match down.clone() {
+                                Down::PullResp(pull_resp) => {
+                                    // send downlinks to LoRaWAN layer
+                                    self.sender.send(pull_resp.clone().into()).unwrap();
+                                }
+                                Down::PullAck(_) | Down::PushAck(_) => {
+                                    // send downlinks to LoRaWAN layer
+                                    self.sender.send(Packet::Down(down.clone())).unwrap();
+                                }
+                            },
                         }
-                        // tolerate bad frames
-                        Err(_) => (),
                     }
                 }
                 Err(_) => {
@@ -165,7 +161,7 @@ impl UdpRuntimeTx {
             if let Some(mut data) = tx {
                 match &mut data {
                     Packet::Up(ref mut up) => {
-                        up.set_gateway_mac(MacAddress::from(self.gateway_id));
+                        up.set_gateway_mac(self.gateway_id);
                         match up {
                             Up::PushData(ref mut push_data) => {
                                 push_data.random_token = rand::random()
@@ -180,9 +176,9 @@ impl UdpRuntimeTx {
                 }
 
                 let n = data.serialize(&mut buf)? as usize;
-                if let Err(_) = self.socket_send.send(&buf[..n]).await {
+                if self.socket_send.send(&buf[..n]).await.is_err() {
                     // back off of CPU
-                    sleep(Duration::from_secs(10)).await;
+                    sleep(Duration::from_secs(1)).await;
                 }
             }
         }
