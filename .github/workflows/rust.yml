@@ -31,7 +31,7 @@ jobs:
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --features client,server --examples --all
+          args: --all-features
 
       - name: Unit tests
         run: cargo test --features server,client
