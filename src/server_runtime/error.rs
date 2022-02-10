@@ -4,7 +4,7 @@ use tokio::sync::{mpsc, oneshot};
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Ack Error received from gateway")]
+    #[error("Ack Error received from gateway: {0}")]
     Ack(#[from] crate::packet::tx_ack::Error),
     #[error("Send has timed out")]
     SendTimeout,
@@ -12,13 +12,13 @@ pub enum Error {
     DispatchWithNoSendPacket,
     #[error("Client requested to transmit to unknown MAC")]
     UnknownMac,
-    #[error("Io Error from using UDP")]
+    #[error("Io Error from using UDP: {0}")]
     UdpError(#[from] std::io::Error),
-    #[error("ClientEventQueue Full")]
+    #[error("ClientEventQueue Full: {0}")]
     ClientEventQueueFull(#[from] Box<mpsc::error::SendError<Event>>),
     #[error("Internal queue closed or full")]
     InternalQueueClosedOrFull,
-    #[error("Semtech UDP error")]
+    #[error("Semtech UDP error: {0}")]
     SemtechUdp(#[from] crate::packet::Error),
     #[error("error receiving ACK")]
     AckRecv,
