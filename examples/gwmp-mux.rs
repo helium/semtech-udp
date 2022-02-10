@@ -27,18 +27,14 @@ fn main() {
         .unwrap();
     runtime.block_on(async move {
         let (shutdown_trigger, shutdown_signal) = triggered::trigger();
-
-        let logger = slog_scope::logger().new(o!());
-        if let Err(e) = host_and_mux_sup(cli, run_logger, shutdown_signal).await {
-            error!(&logger, "Error with host: {e}");
-        }
+        tokio::spawn(host_and_mux_sup(cli, run_logger, shutdown_signal));
         watch_for_shutdown().await;
         shutdown_trigger.trigger();
     });
 
-    runtime.shutdown_timeout(Duration::from_secs(0));
     info!(&logger, "Shutting down");
     drop(scope_guard);
+    runtime.shutdown_timeout(Duration::from_secs(0));
 }
 
 async fn watch_for_shutdown() {
@@ -53,19 +49,24 @@ async fn watch_for_shutdown() {
     }
 }
 
-async fn host_and_mux_sup(
-    cli: Opt,
-    logger: Logger,
-    shutdown_signal: triggered::Listener,
-) -> Result<(), Box<dyn std::error::Error>> {
+// async fn watch_for_shutdown() {
+//     let mut in_buf = [0u8; 64];
+//     let mut stdin = tokio::io::stdin();
+//     read = stdin.read(&mut in_buf) => if let Ok(0) = read { return },
+//
+// }
+
+async fn host_and_mux_sup(cli: Opt, logger: Logger, shutdown_signal: triggered::Listener) {
     let logger_copy = logger.clone();
     let shutdown_signal_copy = shutdown_signal.clone();
     tokio::select!(
-             _ = shutdown_signal => {
-            info!(&logger, "Shutting down host_and_mux");
-            Ok(())},
-                res = host_and_mux(cli, logger_copy, shutdown_signal_copy) => res
-    )
+             _ = shutdown_signal => info!(&logger, "Shutting down host_and_mux"),
+                res = host_and_mux(cli, logger_copy, shutdown_signal_copy) => {
+            if let Err(e) = res {
+                error!(&logger, "host_and_mux error: {e}");
+            }
+                }
+    );
 }
 
 async fn host_and_mux(
