@@ -16,7 +16,6 @@ fn main() {
     let cli = Opt::from_args();
     let logger = mk_logger(cli.log_level, cli.disable_timestamp);
     let scope_guard = slog_scope::set_global_logger(logger);
-    let run_logger = slog_scope::logger().new(o!());
     let logger = slog_scope::logger().new(o!());
 
     let _log_guard = slog_stdlog::init().unwrap();
@@ -27,7 +26,7 @@ fn main() {
         .unwrap();
     runtime.block_on(async move {
         let (shutdown_trigger, shutdown_signal) = triggered::trigger();
-        tokio::spawn(host_and_mux_sup(cli, run_logger, shutdown_signal));
+        tokio::spawn(host_and_mux_sup(cli, shutdown_signal));
         watch_for_shutdown().await;
         shutdown_trigger.trigger();
     });
@@ -49,19 +48,12 @@ async fn watch_for_shutdown() {
     }
 }
 
-// async fn watch_for_shutdown() {
-//     let mut in_buf = [0u8; 64];
-//     let mut stdin = tokio::io::stdin();
-//     read = stdin.read(&mut in_buf) => if let Ok(0) = read { return },
-//
-// }
-
-async fn host_and_mux_sup(cli: Opt, logger: Logger, shutdown_signal: triggered::Listener) {
-    let logger_copy = logger.clone();
+async fn host_and_mux_sup(cli: Opt, shutdown_signal: triggered::Listener) {
+    let logger = slog_scope::logger().new(o!());
     let shutdown_signal_copy = shutdown_signal.clone();
     tokio::select!(
              _ = shutdown_signal => info!(&logger, "Shutting down host_and_mux"),
-                res = host_and_mux(cli, logger_copy, shutdown_signal_copy) => {
+                res = host_and_mux(cli, shutdown_signal_copy) => {
             if let Err(e) = res {
                 error!(&logger, "host_and_mux error: {e}");
             }
@@ -71,9 +63,9 @@ async fn host_and_mux_sup(cli: Opt, logger: Logger, shutdown_signal: triggered::
 
 async fn host_and_mux(
     cli: Opt,
-    logger: Logger,
     shutdown_signal: triggered::Listener,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let logger = slog_scope::logger().new(o!());
     let addr = SocketAddr::from(([0, 0, 0, 0], cli.host));
     info!(&logger, "Starting server: {addr}");
     let (mut client_rx, client_tx) = UdpRuntime::new(addr).await?.split();
@@ -91,11 +83,9 @@ async fn host_and_mux(
                 info!(&logger, "New packet forwarder client: {mac}, {addr}");
                 let mut clients = Vec::new();
                 for address in &cli.client {
-                    let client_instance_logger = slog_scope::logger().new(o!());
                     match spawn_client_instance(
                         client_shutdown_signal.clone(),
                         client_tx.clone(),
-                        client_instance_logger,
                         mac,
                         address.clone(),
                     )
@@ -153,10 +143,10 @@ pub struct Opt {
 async fn spawn_client_instance(
     shutdown_signal: triggered::Listener,
     client_tx: server_runtime::ClientTx,
-    logger: slog::Logger,
     mac_address: MacAddress,
     host: String,
 ) -> Result<tokio::sync::mpsc::Sender<semtech_udp::Packet>, Box<dyn std::error::Error>> {
+    let logger = slog_scope::logger().new(o!());
     let outbound = SocketAddr::from(([0, 0, 0, 0], 0));
     let socket = SocketAddr::from_str(&host)?;
     info!(
@@ -171,14 +161,15 @@ async fn spawn_client_instance(
     tokio::spawn(async move {
         udp_runtime.run().await.unwrap();
     });
-    let local_logger = logger.clone();
+
     let return_sender = sender.clone();
     tokio::spawn(async move {
+        let logger = slog_scope::logger().new(o!());
         tokio::select!(
-             _ = shutdown_signal => info!(&local_logger, "Shutting down client instance"),
-                res = client_instance(receiver, sender, client_tx, logger, mac_address, host) => {
+             _ = shutdown_signal => info!(&logger, "Shutting down client instance"),
+                res = client_instance(receiver, sender, client_tx, mac_address, host) => {
                 if let Err(e) = res {
-                    error!(local_logger, "Error with client instance: {e:?}");
+                    error!(logger, "Error with client instance: {e:?}");
                 }
         }
 
@@ -191,10 +182,10 @@ async fn client_instance(
     mut receiver: tokio::sync::broadcast::Receiver<RxMessage>,
     sender: tokio::sync::mpsc::Sender<RxMessage>,
     mut client_tx: server_runtime::ClientTx,
-    logger: slog::Logger,
     mac_address: MacAddress,
     host: String,
 ) -> Result<tokio::sync::mpsc::Sender<semtech_udp::Packet>, Box<dyn std::error::Error>> {
+    let logger = slog_scope::logger().new(o!());
     let uplink_sender = sender.clone();
     tokio::spawn(async move {
         loop {
