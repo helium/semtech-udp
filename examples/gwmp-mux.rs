@@ -29,7 +29,7 @@ fn main() {
         let (shutdown_trigger, shutdown_signal) = triggered::trigger();
 
         let logger = slog_scope::logger().new(o!());
-        if let Err(e) = run_host_and_mux(cli, run_logger, shutdown_signal).await {
+        if let Err(e) = host_and_mux_sup(cli, run_logger, shutdown_signal).await {
             error!(&logger, "Error with host: {e}");
         }
         watch_for_shutdown().await;
@@ -53,20 +53,22 @@ async fn watch_for_shutdown() {
     }
 }
 
-async fn run_host_and_mux(
+async fn host_and_mux_sup(
     cli: Opt,
     logger: Logger,
     shutdown_signal: triggered::Listener,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let logger_copy = logger.clone();
     let shutdown_signal_copy = shutdown_signal.clone();
     tokio::select!(
-             _ = shutdown_signal => Ok(()),
-                res = process_host_and_mux(cli, logger, shutdown_signal_copy) => res
-
+             _ = shutdown_signal => {
+            info!(&logger, "Shutting down host_and_mux");
+            Ok(())},
+                res = host_and_mux(cli, logger_copy, shutdown_signal_copy) => res
     )
 }
 
-async fn process_host_and_mux(
+async fn host_and_mux(
     cli: Opt,
     logger: Logger,
     shutdown_signal: triggered::Listener,
@@ -93,7 +95,7 @@ async fn process_host_and_mux(
                         client_shutdown_signal.clone(),
                         client_tx.clone(),
                         client_instance_logger,
-                        mac.clone(),
+                        mac,
                         address.clone(),
                     )
                     .await
@@ -172,7 +174,7 @@ async fn spawn_client_instance(
     let return_sender = sender.clone();
     tokio::spawn(async move {
         tokio::select!(
-             _ = shutdown_signal => (),
+             _ = shutdown_signal => info!(&local_logger, "Shutting down client instance"),
                 res = client_instance(receiver, sender, client_tx, logger, mac_address, host) => {
                 if let Err(e) = res {
                     error!(local_logger, "Error with client instance: {e:?}");
@@ -181,7 +183,7 @@ async fn spawn_client_instance(
 
         )
     });
-    Ok(return_sender.clone())
+    Ok(return_sender)
 }
 
 async fn client_instance(
