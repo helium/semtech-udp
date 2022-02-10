@@ -1,5 +1,5 @@
 use semtech_udp::client_runtime::UdpRuntime;
-use semtech_udp::{MacAddress, Up::PushData};
+use semtech_udp::MacAddress;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
@@ -8,48 +8,37 @@ use tokio::time::sleep;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let (shutdown_trigger, shutdown_signal) = triggered::trigger();
+
     let mac_address = MacAddress::from([0, 0, 0, 0, 4, 3, 2, 1]);
     let cli = Opt::from_args();
-    let outbound = SocketAddr::from(([0, 0, 0, 0], 0));
     let host = SocketAddr::from_str(cli.host.as_str())?;
-    println!("Connecting to server {} from port {}", cli.host, outbound);
-    let udp_runtime = UdpRuntime::new(mac_address, outbound, host).await?;
+    println!("Connecting to server {}", cli.host);
+    let (uplink_sender, mut downlink_request_receiver, udp_runtime) =
+        UdpRuntime::new(mac_address, host).await?;
 
-    let (mut receiver, sender) = (udp_runtime.subscribe(), udp_runtime.publish_to());
+    let udp_runtime_task = tokio::spawn(udp_runtime.run(shutdown_signal));
 
-    tokio::spawn(async move {
-        udp_runtime.run().await.unwrap();
-    });
-
-    let uplink_sender = sender.clone();
     tokio::spawn(async move {
         loop {
             println!("Sending a random uplink");
+
             uplink_sender
-                .send(semtech_udp::Packet::Up(PushData(
-                    semtech_udp::push_data::Packet::random(),
-                )))
+                .send(semtech_udp::push_data::Packet::random())
                 .await
                 .unwrap();
             sleep(Duration::from_secs(5)).await;
         }
     });
 
-    loop {
-        let msg = receiver.recv().await?;
-        println!("msg: {:?}", msg);
-
-        match msg {
-            semtech_udp::Packet::Down(down) => {
-                if let semtech_udp::Down::PullResp(packet) = down {
-                    // it is the client's responsibility to ack the tx request
-                    let ack = (*packet).into_ack_for_gateway(mac_address);
-                    sender.send(ack.into()).await?;
-                }
-            }
-            semtech_udp::Packet::Up(_up) => panic!("Should not receive Semtech up frames"),
-        }
+    while let Some(downlink_request) = downlink_request_receiver.recv().await {
+        downlink_request.ack().await?;
     }
+    shutdown_trigger.trigger();
+    if let Err(e) = udp_runtime_task.await? {
+        println!("UdpRunTime return error {e}");
+    }
+    Ok(())
 }
 
 #[derive(Debug, StructOpt)]
