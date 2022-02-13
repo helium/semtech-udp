@@ -67,7 +67,7 @@ impl DownlinkRequest {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ClientTx {
     udp_sender: mpsc::Sender<TxMessage>,
 }
