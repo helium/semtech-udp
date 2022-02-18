@@ -2,7 +2,7 @@ use super::{
     parser::Parser, pull_resp, pull_resp::TxPk, tx_ack::Packet as TxAck, MacAddress, Packet,
     ParseError, SerializablePacket, Up,
 };
-pub use crate::push_data::RxPk;
+pub use crate::push_data::{RxPk, Stat};
 use std::sync::Arc;
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tokio::{
@@ -21,6 +21,7 @@ enum InternalEvent {
     PacketBySocket((Packet, SocketAddr)),
     Client((MacAddress, SocketAddr)),
     PacketReceived(RxPk, MacAddress),
+    StatReceived(Stat, MacAddress),
     UnableToParseUdpFrame(ParseError, Vec<u8>),
     AckReceived(TxAck),
 }
@@ -28,6 +29,7 @@ enum InternalEvent {
 #[derive(Debug)]
 pub enum Event {
     PacketReceived(RxPk, MacAddress),
+    StatReceived(Stat, MacAddress),
     NewClient((MacAddress, SocketAddr)),
     UpdateClient((MacAddress, SocketAddr)),
     UnableToParseUdpFrame(ParseError, Vec<u8>),
@@ -279,6 +281,15 @@ impl UdpRx {
                                             }
                                         }
 
+                                        if let Some(stat) = &push_data.data.stat {
+                                            self.internal_sender
+                                                .send(InternalEvent::StatReceived(
+                                                    stat.clone(),
+                                                    push_data.gateway_mac,
+                                                ))
+                                                .await?;
+                                        }
+
                                         let socket_addr = src;
                                         // send the ack_packet
                                         let ack_packet = push_data.into_ack();
@@ -317,6 +328,11 @@ impl Internal {
                     InternalEvent::PacketReceived(rxpk, mac) => {
                         self.client_tx_sender
                             .send(Event::PacketReceived(rxpk, mac))
+                            .await?;
+                    }
+                    InternalEvent::StatReceived(stat, mac) => {
+                        self.client_tx_sender
+                            .send(Event::StatReceived(stat, mac))
                             .await?;
                     }
                     InternalEvent::Downlink((packet, mac, ack_sender)) => {
