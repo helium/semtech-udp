@@ -1,4 +1,4 @@
-use super::{Event, InternalEvent};
+use super::{Event, InternalEvent, SystemTime};
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
@@ -24,6 +24,13 @@ pub enum Error {
     AckRecv,
     #[error("error sending ACK")]
     AckSend,
+    #[error("Join error: {0}")]
+    Join(#[from] tokio::task::JoinError),
+    #[error("Client was last seen in the future ({last_seen:?}) compared to now ({now:?})")]
+    LastSeen {
+        last_seen: SystemTime,
+        now: SystemTime,
+    },
 }
 
 impl From<tokio::time::error::Elapsed> for Error {

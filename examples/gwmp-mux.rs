@@ -119,7 +119,10 @@ async fn host_and_mux(cli: Opt, shutdown_signal: triggered::Listener) -> Result 
                         to_send = Some(push_data::Packet::from_stat(mac, stat));
                     }
                     ServerEvent::NoClientWithMac(_packet, mac) => {
-                        warn!(logger, "Downlink sent but unknown mac: {mac:?}");
+                        warn!(logger, "Downlink sent but unknown mac: {mac}");
+                    }
+                    ServerEvent::ClientDisconnected((mac, addr)) => {
+                        warn!(logger, "Mac {mac} disconnected from {addr}");
                     }
                 }
                 if let Some(packet) = to_send {

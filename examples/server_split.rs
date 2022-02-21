@@ -97,6 +97,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::NoClientWithMac(_packet, mac) => {
                 println!("Tried to send to client with unknown MAC: {:?}", mac)
             }
+            Event::ClientDisconnected((mac, addr)) => {
+                println!("Client disconnected: {mac}, {addr}");
+            }
         }
     }
 }

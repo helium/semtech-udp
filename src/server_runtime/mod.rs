@@ -4,6 +4,7 @@ use super::{
 };
 pub use crate::push_data::{RxPk, Stat};
 use std::sync::Arc;
+use std::time::SystemTime;
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tokio::{
     net::{ToSocketAddrs, UdpSocket},
@@ -15,6 +16,9 @@ mod error;
 pub use error::Error;
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
+const DEFAULT_DISCONNECT_THRESHOLD: u64 = 60;
+const DEFAULT_CACHE_CHECK_FREQ: u64 = 60;
+
 #[derive(Debug)]
 enum InternalEvent {
     Downlink((pull_resp::Packet, MacAddress, oneshot::Sender<TxAck>)),
@@ -24,6 +28,7 @@ enum InternalEvent {
     StatReceived(Stat, MacAddress),
     UnableToParseUdpFrame(ParseError, Vec<u8>),
     AckReceived(TxAck),
+    CheckCache,
 }
 
 #[derive(Debug)]
@@ -34,6 +39,7 @@ pub enum Event {
     UpdateClient((MacAddress, SocketAddr)),
     UnableToParseUdpFrame(ParseError, Vec<u8>),
     NoClientWithMac(Box<pull_resp::Packet>, MacAddress),
+    ClientDisconnected((MacAddress, SocketAddr)),
 }
 
 // receives requests from clients
@@ -60,9 +66,37 @@ struct UdpRx {
 struct Internal {
     receiver: mpsc::Receiver<InternalEvent>,
     client_tx_sender: mpsc::Sender<Event>,
-    clients: HashMap<MacAddress, SocketAddr>,
+    clients: HashMap<MacAddress, Client>,
     downlink_senders: HashMap<u16, oneshot::Sender<TxAck>>,
     socket_sender: Arc<UdpSocket>,
+    disconnect_threshold: Option<Duration>,
+}
+
+#[derive(Debug, Clone)]
+struct Client {
+    addr: SocketAddr,
+    last_seen: SystemTime,
+}
+
+impl Client {
+    fn new(addr: SocketAddr) -> Self {
+        Client {
+            addr,
+            last_seen: SystemTime::now(),
+        }
+    }
+    fn addr(&self) -> &SocketAddr {
+        &self.addr
+    }
+
+    fn update_addr(&mut self, new_addr: SocketAddr) {
+        self.addr = new_addr;
+        self.seen();
+    }
+
+    fn seen(&mut self) {
+        self.last_seen = SystemTime::now();
+    }
 }
 
 #[derive(Debug)]
@@ -118,7 +152,7 @@ impl Downlink {
 impl ClientRx {
     pub async fn recv(&mut self) -> Event {
         // we unwrap here because the send channel is dropped only iff ClientRx is dropped
-        // ClientRx panics before it can get dropped (see UdpRuntime
+        // ClientRx panics before it can get dropped (see UdpRuntime)
         self.receiver.recv().await.unwrap()
     }
 }
@@ -195,6 +229,7 @@ impl UdpRuntime {
             clients: HashMap::new(),
             downlink_senders: HashMap::new(),
             socket_sender,
+            disconnect_threshold: Some(Duration::from_secs(DEFAULT_DISCONNECT_THRESHOLD)),
         };
 
         // udp_rx reads from the UDP port
@@ -226,90 +261,105 @@ impl UdpRuntime {
 
 impl UdpRx {
     pub async fn run(self) -> Result {
-        let mut buf = vec![0u8; 1024];
-        loop {
-            match self.socket_receiver.recv_from(&mut buf).await {
-                Err(e) => return Err(e.into()),
-                Ok((n, src)) => {
-                    let packet = match Packet::parse(&buf[0..n]) {
-                        Ok(packet) => Some(packet),
-                        Err(e) => {
-                            let mut vec = Vec::new();
-                            vec.extend_from_slice(&buf[0..n]);
-                            self.internal_sender
-                                .send(InternalEvent::UnableToParseUdpFrame(e, vec))
-                                .await?;
-                            None
-                        }
-                    };
-                    if let Some(packet) = packet {
-                        match packet {
-                            Packet::Up(packet) => {
-                                match packet {
-                                    Up::PullData(pull_data) => {
-                                        let mac = pull_data.gateway_mac;
-                                        // first send (mac, addr) to update map owned by UdpRuntimeTx
-                                        let client = (mac, src);
-                                        self.internal_sender
-                                            .send(InternalEvent::Client(client))
-                                            .await?;
+        let cache_sender = self.internal_sender.clone();
+        let cache_sender = tokio::spawn(async move {
+            loop {
+                cache_sender.send(InternalEvent::CheckCache).await?;
+                tokio::time::sleep(Duration::from_secs(DEFAULT_CACHE_CHECK_FREQ)).await;
+            }
+        });
 
-                                        // send the ack_packet
-                                        let ack_packet = pull_data.into_ack();
-                                        self.internal_sender
-                                            .send(InternalEvent::PacketBySocket((
-                                                ack_packet.into(),
-                                                src,
-                                            )))
-                                            .await?
-                                    }
-                                    Up::TxAck(txack) => {
-                                        self.internal_sender
-                                            .send(InternalEvent::AckReceived(txack))
-                                            .await?;
-                                    }
-                                    Up::PushData(push_data) => {
-                                        // Send all received packets as RxPk Events
-                                        if let Some(rxpk) = &push_data.data.rxpk {
-                                            for packet in rxpk {
+        let socket_handler = tokio::spawn(async move {
+            let mut buf = vec![0u8; 1024];
+            loop {
+                match self.socket_receiver.recv_from(&mut buf).await {
+                    Err(e) => return Err(e.into()),
+                    Ok((n, src)) => {
+                        let packet = match Packet::parse(&buf[0..n]) {
+                            Ok(packet) => Some(packet),
+                            Err(e) => {
+                                let mut vec = Vec::new();
+                                vec.extend_from_slice(&buf[0..n]);
+                                self.internal_sender
+                                    .send(InternalEvent::UnableToParseUdpFrame(e, vec))
+                                    .await?;
+                                None
+                            }
+                        };
+                        if let Some(packet) = packet {
+                            match packet {
+                                Packet::Up(packet) => {
+                                    match packet {
+                                        Up::PullData(pull_data) => {
+                                            let mac = pull_data.gateway_mac;
+                                            // first send (mac, addr) to update map owned by UdpRuntimeTx
+                                            let client = (mac, src);
+                                            self.internal_sender
+                                                .send(InternalEvent::Client(client))
+                                                .await?;
+
+                                            // send the ack_packet
+                                            let ack_packet = pull_data.into_ack();
+                                            self.internal_sender
+                                                .send(InternalEvent::PacketBySocket((
+                                                    ack_packet.into(),
+                                                    src,
+                                                )))
+                                                .await?
+                                        }
+                                        Up::TxAck(txack) => {
+                                            self.internal_sender
+                                                .send(InternalEvent::AckReceived(txack))
+                                                .await?;
+                                        }
+                                        Up::PushData(push_data) => {
+                                            // Send all received packets as RxPk Events
+                                            if let Some(rxpk) = &push_data.data.rxpk {
+                                                for packet in rxpk {
+                                                    self.internal_sender
+                                                        .send(InternalEvent::PacketReceived(
+                                                            packet.clone(),
+                                                            push_data.gateway_mac,
+                                                        ))
+                                                        .await?;
+                                                }
+                                            }
+
+                                            if let Some(stat) = &push_data.data.stat {
                                                 self.internal_sender
-                                                    .send(InternalEvent::PacketReceived(
-                                                        packet.clone(),
+                                                    .send(InternalEvent::StatReceived(
+                                                        stat.clone(),
                                                         push_data.gateway_mac,
                                                     ))
                                                     .await?;
                                             }
-                                        }
 
-                                        if let Some(stat) = &push_data.data.stat {
+                                            let socket_addr = src;
+                                            // send the ack_packet
+                                            let ack_packet = push_data.into_ack();
                                             self.internal_sender
-                                                .send(InternalEvent::StatReceived(
-                                                    stat.clone(),
-                                                    push_data.gateway_mac,
-                                                ))
+                                                .send(InternalEvent::PacketBySocket((
+                                                    ack_packet.into(),
+                                                    socket_addr,
+                                                )))
                                                 .await?;
                                         }
-
-                                        let socket_addr = src;
-                                        // send the ack_packet
-                                        let ack_packet = push_data.into_ack();
-                                        self.internal_sender
-                                            .send(InternalEvent::PacketBySocket((
-                                                ack_packet.into(),
-                                                socket_addr,
-                                            )))
-                                            .await?;
                                     }
                                 }
-                            }
-                            Packet::Down(_) => {
-                                panic!("Should not receive this frame from forwarder")
-                            }
-                        };
+                                Packet::Down(_) => {
+                                    panic!("Should not receive this frame from forwarder")
+                                }
+                            };
+                        }
                     }
                 }
             }
-        }
+        });
+
+        tokio::select!(
+            resp = cache_sender => resp?,
+            resp = socket_handler => resp?,
+        )
     }
 }
 
@@ -320,6 +370,27 @@ impl Internal {
             let msg = self.receiver.recv().await;
             if let Some(msg) = msg {
                 match msg {
+                    InternalEvent::CheckCache => {
+                        let now = SystemTime::now();
+                        if let Some(disconnect_threshold) = self.disconnect_threshold {
+                            for (mac, client) in self.clients.clone().into_iter() {
+                                let time_since_last_seen = now
+                                    .duration_since(client.last_seen)
+                                    .map_err(|_| Error::LastSeen {
+                                        last_seen: client.last_seen,
+                                        now,
+                                    })?;
+
+                                if time_since_last_seen > disconnect_threshold {
+                                    // Client not connected
+                                    self.client_tx_sender
+                                        .send(Event::ClientDisconnected((mac, *client.addr())))
+                                        .await?;
+                                    self.clients.remove(&mac);
+                                }
+                            }
+                        }
+                    }
                     InternalEvent::UnableToParseUdpFrame(error, frame) => {
                         self.client_tx_sender
                             .send(Event::UnableToParseUdpFrame(error, frame))
@@ -338,12 +409,20 @@ impl Internal {
                     InternalEvent::Downlink((packet, mac, ack_sender)) => {
                         let mut no_client = true;
 
-                        if let Some(addr) = self.clients.get(&mac) {
+                        if let Some(client) = self.clients.get(&mac) {
                             let n = packet.serialize(&mut buf)? as usize;
                             // We receive an error here if we are trying to send the packet to a
                             // client that is no longer connected to us. Delete the client from map
-                            if self.socket_sender.send_to(&buf[..n], addr).await.is_err() {
+                            if self
+                                .socket_sender
+                                .send_to(&buf[..n], client.addr())
+                                .await
+                                .is_err()
+                            {
                                 // Client not connected
+                                self.client_tx_sender
+                                    .send(Event::ClientDisconnected((mac, *client.addr())))
+                                    .await?;
                                 self.clients.remove(&mac);
                             } else {
                                 // store token and one-shot channel
@@ -372,17 +451,20 @@ impl Internal {
                     }
                     InternalEvent::Client((mac, addr)) => {
                         // tell user if same MAC has new IP
-                        if let Some(existing_addr) = self.clients.get(&mac) {
-                            if *existing_addr != addr {
-                                self.clients.insert(mac, addr);
+                        if let Some(client) = self.clients.get_mut(&mac) {
+                            if *client.addr() != addr {
+                                client.update_addr(addr);
                                 self.client_tx_sender
                                     .send(Event::UpdateClient((mac, addr)))
                                     .await?;
+                            } else {
+                                // refresh the seen
+                                client.seen();
                             }
                         }
                         // simply insert if no entry exists
                         else {
-                            self.clients.insert(mac, addr);
+                            self.clients.insert(mac, Client::new(addr));
                             self.client_tx_sender
                                 .send(Event::NewClient((mac, addr)))
                                 .await?;
