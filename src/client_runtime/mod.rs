@@ -146,9 +146,7 @@ impl UdpRuntime {
         let pull_req_sender = tokio::spawn(async move {
             loop {
                 let packet = pull_data::Packet::new(rand::random());
-                if let Err(e) = poll_sender.send(packet.into()).await {
-                    panic!("UdpRuntime error from sending PullData {}", e)
-                }
+                poll_sender.send(packet.into()).await?;
                 sleep(Duration::from_millis(10000)).await;
             }
         });
