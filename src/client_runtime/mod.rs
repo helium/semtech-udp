@@ -4,8 +4,7 @@
    receive downlink packets and send uplink packets easily
 */
 use crate::{
-    parser::Parser, pull_data, pull_resp, push_data, Down, MacAddress, Packet, SerializablePacket,
-    Up,
+    pull_data, pull_resp, push_data, Down, MacAddress, Packet, ParseError, SerializablePacket, Up,
 };
 use std::sync::Arc;
 use tokio::{
@@ -23,7 +22,7 @@ pub type TxMessage = Packet;
 struct Rx {
     mac: MacAddress,
     udp_sender: mpsc::Sender<TxMessage>,
-    client_sender: mpsc::Sender<DownlinkRequest>,
+    client_sender: mpsc::Sender<Event>,
     socket_recv: Arc<UdpSocket>,
 }
 
@@ -39,7 +38,13 @@ pub struct UdpRuntime {
     poll_sender: Sender<TxMessage>,
 }
 
-pub type ClientRx = mpsc::Receiver<DownlinkRequest>;
+pub type ClientRx = mpsc::Receiver<Event>;
+
+#[derive(Debug)]
+pub enum Event {
+    DownlinkRequest(DownlinkRequest),
+    UnableToParseUdpFrame(ParseError, Vec<u8>),
+}
 
 // A downlink request is sent to the client and contains the necessary
 // information and channels to create the NACK or ACK
@@ -177,23 +182,30 @@ impl Rx {
         loop {
             match self.socket_recv.recv(&mut buf).await {
                 Ok(n) => {
-                    if let Ok(packet) = Packet::parse(&buf[0..n]) {
-                        match packet {
-                            Packet::Up(_) => panic!("Should not be receiving any up packets"),
-                            Packet::Down(down) => match down.clone() {
-                                // pull_resp is a request to sent an RF packet
-                                // we hand this off to the runtime client
-                                Down::PullResp(pull_resp) => {
-                                    let dowlink_request = self.new_downlink_request(*pull_resp);
-                                    self.client_sender.send(dowlink_request).await?;
-                                }
-                                // pull_ack just lets us know that the "connection is open"
-                                // could potentially have a timer that waits for these on every
-                                // pull_data frame
-                                Down::PullAck(_) => (),
-                                // push_ack is sent immediately after push_data (uplink, ie: RF packet received)
-                                Down::PushAck(_) => (),
-                            },
+                    match Packet::parse_downlink(&buf[0..n]) {
+                        Ok(down) => match down {
+                            // pull_resp is a request to sent an RF packet
+                            // we hand this off to the runtime client
+                            Down::PullResp(pull_resp) => {
+                                let downlink_request = self.new_downlink_request(*pull_resp);
+                                self.client_sender
+                                    .send(Event::DownlinkRequest(downlink_request))
+                                    .await?;
+                            }
+                            // pull_ack just lets us know that the "connection is open"
+                            // could potentially have a timer that waits for these on every
+                            // pull_data frame
+                            Down::PullAck(_) => (),
+                            // push_ack is sent immediately after push_data (uplink, ie: RF packet received)
+                            Down::PushAck(_) => (),
+                        },
+                        Err(e) => {
+                            let mut vec = Vec::new();
+                            vec.extend_from_slice(&buf[0..n]);
+
+                            self.client_sender
+                                .send(Event::UnableToParseUdpFrame(e, vec))
+                                .await?;
                         }
                     }
                 }

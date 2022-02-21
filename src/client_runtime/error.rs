@@ -14,5 +14,5 @@ pub enum Error {
     #[error("Join error: {0}")]
     Join(#[from] tokio::task::JoinError),
     #[error("Error sending downlink request to client: {0}")]
-    SendingDownlinkRequest(#[from] tokio::sync::mpsc::error::SendError<super::DownlinkRequest>),
+    SendingClient(#[from] tokio::sync::mpsc::error::SendError<super::Event>),
 }

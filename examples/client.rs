@@ -1,4 +1,4 @@
-use semtech_udp::client_runtime::UdpRuntime;
+use semtech_udp::client_runtime::{Event, UdpRuntime};
 use semtech_udp::MacAddress;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -31,8 +31,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    while let Some(downlink_request) = downlink_request_receiver.recv().await {
-        downlink_request.ack().await?;
+    while let Some(event) = downlink_request_receiver.recv().await {
+        match event {
+            Event::DownlinkRequest(downlink_request) => downlink_request.ack().await?,
+            Event::UnableToParseUdpFrame(parse_error, _buffer) => {
+                println!("Error parsing UDP frame {}", parse_error)
+            }
+        }
     }
     shutdown_trigger.trigger();
     if let Err(e) = udp_runtime_task.await? {
