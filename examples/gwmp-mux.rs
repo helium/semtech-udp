@@ -216,12 +216,12 @@ async fn run_client_instance(
     ));
     tokio::select!(
         _ = shutdown_signal =>
-            info!(&logger, "Shutting down client instance"),
+            info!(&logger, "Shutting down client instance {mac}"),
         resp = runtime => if let Err(e) = resp {
-            error!(&logger, "Error in client instance udp_runtime: {e}")
+            error!(&logger, "Error in client instance {mac} udp_runtime: {e}")
         },
         resp = receive => if let Err(e) = resp {
-            error!(&logger, "Error in client instance receiver: {e}")
+            error!(&logger, "Error in client instance {mac} receiver: {e}")
         }
     );
 
