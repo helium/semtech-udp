@@ -89,8 +89,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("Mac existed, but IP updated: {}, {}", mac, addr);
             }
             Event::PacketReceived(rxpk, addr) => {
-                println!("Packet Receveived from {addr}:");
-                println!("\t{rxpk:?}");
+                println!("Packet Receveived from {addr}: {rxpk:?}");
+            }
+            Event::StatReceived(stat, addr) => {
+                println!("Stat Receveived from {addr}: {stat:?}");
             }
             Event::NoClientWithMac(_packet, mac) => {
                 println!("Tried to send to client with unknown MAC: {:?}", mac)
