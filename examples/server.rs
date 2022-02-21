@@ -56,11 +56,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 tokio::spawn(async move {
                     if let Err(e) = prepared_send.dispatch(Some(Duration::from_secs(5))).await {
-                        panic!("Transmit Dispatch threw error: {:?}", e)
+                        panic!("Transmit Dispatch threw error: {e:?}")
                     } else {
                         println!("Send complete");
                     }
                 });
+            }
+            Event::StatReceived(stat, gateway_mac) => {
+                println!("From {gateway_mac}: {stat:?}");
             }
             Event::NoClientWithMac(_packet, mac) => {
                 println!("Tried to send to client with unknown MAC: {mac:?}")

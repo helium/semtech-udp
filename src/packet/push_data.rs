@@ -40,6 +40,17 @@ impl Packet {
         }
     }
 
+    pub fn from_stat(stat: Stat) -> Packet {
+        Packet {
+            random_token: 0,
+            gateway_mac: MacAddress::from([0; 8]),
+            data: Data {
+                rxpk: None,
+                stat: Some(stat),
+            },
+        }
+    }
+
     pub fn random() -> Packet {
         let rxpk = vec![RxPk::V1(RxPkV1 {
             chan: 0,

@@ -84,10 +84,11 @@ async fn host_and_mux(cli: Opt, shutdown_signal: triggered::Listener) -> Result 
                 return Ok(());
             },
             server_event = client_rx.recv() => {
-                match server_event {
+                if let Some((mut packet, mac)) = match server_event {
                     ServerEvent::UnableToParseUdpFrame(error, buf) => {
                         error!(logger, "Semtech UDP Parsing Error: {error}");
                         error!(logger, "UDP data: {buf:?}");
+                        None
                     }
                     ServerEvent::NewClient((mac, addr)) => {
                         info!(logger, "New packet forwarder client: {mac}, {addr}");
@@ -105,29 +106,40 @@ async fn host_and_mux(cli: Opt, shutdown_signal: triggered::Listener) -> Result 
                             handles.push(handle);
                         }
                         mux.insert(mac, clients);
+                        None
                     }
                     ServerEvent::UpdateClient((mac, addr)) => {
                         info!(logger, "Mac existed, but IP updated: {mac}, {addr}");
+                        None
                     }
-                    ServerEvent::PacketReceived(rxpk, gateway_mac) => {
-                        info!(logger, "Uplink Received {rxpk:?}");
-                        if let Some(clients) = mux.get_mut(&gateway_mac) {
-                            for sender in clients {
-                                debug!(logger, "Forwarding Uplink");
-                                let mut packet = push_data::Packet::from_rxpk(rxpk.clone());
-                                packet.gateway_mac = gateway_mac;
-                                let logger = logger.clone();
-                                let sender = sender.clone();
-                                tokio::spawn ( async move {
-                                    if let Err(e) = sender.send(packet).await {
-                                        error!(logger, "Error sending to {gateway_mac}: {e}")
-                                    }
-                                });
-                            }
-                        }
+                    ServerEvent::PacketReceived(rxpk, mac) => {
+                        info!(logger, "From {mac} received uplink: {rxpk}");
+
+                        Some((push_data::Packet::from_rxpk(rxpk), mac))
+
+                    }
+                    ServerEvent::StatReceived(stat, mac) => {
+                        info!(logger, "From {mac} received stat: {stat:?}");
+                        Some((push_data::Packet::from_stat(stat), mac))
                     }
                     ServerEvent::NoClientWithMac(_packet, mac) => {
                         warn!(logger, "Downlink sent but unknown mac: {mac:?}");
+                        None
+                    }
+                } {
+                    if let Some(clients) = mux.get_mut(&mac) {
+                        packet.gateway_mac = mac;
+                        for sender in clients {
+                            debug!(logger, "Forwarding Uplink");
+                            let logger = logger.clone();
+                            let sender = sender.clone();
+                            let packet = packet.clone();
+                            tokio::spawn ( async move {
+                                if let Err(e) = sender.send(packet).await {
+                                    error!(logger, "Error sending uplink: {e}")
+                                }
+                            });
+                        }
                     }
                 }
             }
