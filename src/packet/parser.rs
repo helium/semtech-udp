@@ -20,6 +20,21 @@ pub trait Parser {
     fn parse(buffer: &[u8]) -> std::result::Result<Packet, ParseError>;
 }
 
+impl Packet {
+    pub fn parse_uplink(buffer: &[u8]) -> std::result::Result<Up, ParseError> {
+        match Self::parse(buffer)? {
+            Packet::Up(up) => Ok(up),
+            Packet::Down(down) => Err(ParseError::UnexpectedDownlink(down)),
+        }
+    }
+    pub fn parse_downlink(buffer: &[u8]) -> std::result::Result<Down, ParseError> {
+        match Self::parse(buffer)? {
+            Packet::Down(down) => Ok(down),
+            Packet::Up(up) => Err(ParseError::UnexpectedUplink(up)),
+        }
+    }
+}
+
 impl Parser for Packet {
     fn parse(buffer: &[u8]) -> std::result::Result<Packet, ParseError> {
         if buffer[PROTOCOL_VERSION_INDEX] != PROTOCOL_VERSION {

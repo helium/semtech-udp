@@ -1,3 +1,4 @@
+use crate::{Down, Up};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -24,4 +25,8 @@ pub enum ParseError {
         json_str: String,
         json_error: serde_json::Error,
     },
+    #[error("Received downlink when expecting uplinks only")]
+    UnexpectedDownlink(Down),
+    #[error("Received uplink when expecting downlinks only")]
+    UnexpectedUplink(Up),
 }

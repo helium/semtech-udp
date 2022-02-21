@@ -1,6 +1,7 @@
 use semtech_udp::{
-    client_runtime, push_data,
-    server_runtime::{self, Event, UdpRuntime},
+    client_runtime::{self, Event as ClientEvent},
+    push_data,
+    server_runtime::{self, Event as ServerEvent, UdpRuntime},
     tx_ack, MacAddress,
 };
 use slog::{self, debug, error, info, o, warn, Drain, Logger};
@@ -82,13 +83,13 @@ async fn host_and_mux(cli: Opt, shutdown_signal: triggered::Listener) -> Result 
                 info!(&logger, "host_and_mux shutdown complete");
                 return Ok(());
             },
-                event = client_rx.recv() => {
-            match event {
-                    Event::UnableToParseUdpFrame(error, buf) => {
+            server_event = client_rx.recv() => {
+                match server_event {
+                    ServerEvent::UnableToParseUdpFrame(error, buf) => {
                         error!(logger, "Semtech UDP Parsing Error: {error}");
                         error!(logger, "UDP data: {buf:?}");
                     }
-                    Event::NewClient((mac, addr)) => {
+                    ServerEvent::NewClient((mac, addr)) => {
                         info!(logger, "New packet forwarder client: {mac}, {addr}");
                         let mut clients = Vec::new();
                         for address in &cli.client {
@@ -105,21 +106,27 @@ async fn host_and_mux(cli: Opt, shutdown_signal: triggered::Listener) -> Result 
                         }
                         mux.insert(mac, clients);
                     }
-                    Event::UpdateClient((mac, addr)) => {
+                    ServerEvent::UpdateClient((mac, addr)) => {
                         info!(logger, "Mac existed, but IP updated: {mac}, {addr}");
                     }
-                    Event::PacketReceived(rxpk, gateway_mac) => {
+                    ServerEvent::PacketReceived(rxpk, gateway_mac) => {
                         info!(logger, "Uplink Received {rxpk:?}");
                         if let Some(clients) = mux.get_mut(&gateway_mac) {
                             for sender in clients {
                                 debug!(logger, "Forwarding Uplink");
                                 let mut packet = push_data::Packet::from_rxpk(rxpk.clone());
                                 packet.gateway_mac = gateway_mac;
-                                            sender.send(packet).await?;
+                                let logger = logger.clone();
+                                let sender = sender.clone();
+                                tokio::spawn ( async move {
+                                    if let Err(e) = sender.send(packet).await {
+                                        error!(logger, "Error sending to {gateway_mac}: {e}")
+                                    }
+                                });
                             }
                         }
                     }
-                    Event::NoClientWithMac(_packet, mac) => {
+                    ServerEvent::NoClientWithMac(_packet, mac) => {
                         warn!(logger, "Downlink sent but unknown mac: {mac:?}");
                     }
                 }
@@ -181,28 +188,46 @@ async fn run_client_instance_handle_downlink(
 ) -> Result {
     let logger = slog_scope::logger().new(o!());
 
-    while let Some(downlink_request) = receiver.recv().await {
-        let prepared_send = client_tx.prepare_downlink(Some(downlink_request.txpk().clone()), mac);
-        match prepared_send.dispatch(Some(Duration::from_secs(5))).await {
-            Err(server_runtime::Error::Ack(e)) => {
-                error!(&logger, "Error Downlinking to {mac}: {:?}", e);
-                downlink_request.nack(e).await?;
+    while let Some(client_event) = receiver.recv().await {
+        match client_event {
+            ClientEvent::DownlinkRequest(downlink_request) => {
+                let prepared_send =
+                    client_tx.prepare_downlink(Some(downlink_request.txpk().clone()), mac);
+                let logger = logger.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = match prepared_send.dispatch(Some(Duration::from_secs(5))).await
+                    {
+                        Err(server_runtime::Error::Ack(e)) => {
+                            error!(&logger, "Error Downlinking to {mac}: {:?}", e);
+                            downlink_request.nack(e).await
+                        }
+                        Err(server_runtime::Error::SendTimeout) => {
+                            warn!(
+                        &logger,
+                        "Gateway {mac} did not ACK or NACK. Packet forward may not be connected?"
+                    );
+                            downlink_request.nack(tx_ack::Error::SendFail).await
+                        }
+                        Ok(()) => {
+                            debug!(&logger, "Downlink to {mac} successful");
+                            downlink_request.ack().await
+                        }
+                        Err(e) => {
+                            error!(&logger, "Unhandled downlink error: {:?}", e);
+                            Ok(())
+                        }
+                    } {
+                        debug!(&logger, "Error sending downlink to {mac}: {e}");
+                    }
+                });
             }
-            Err(server_runtime::Error::SendTimeout) => {
-                warn!(
+            ClientEvent::UnableToParseUdpFrame(parse_error, buffer) => {
+                error!(
                     &logger,
-                    "Gateway {mac} did not ACK or NACK. Packet forward may not be connected?"
+                    "Error parsing frame from {mac}: {parse_error}, {buffer:?}"
                 );
-                downlink_request.nack(tx_ack::Error::SendFail).await?;
             }
-            Ok(()) => {
-                debug!(&logger, "Downlink to {mac} successful");
-                downlink_request.ack().await?;
-            }
-            Err(e) => {
-                error!(&logger, "Unhandled downlink error: {:?}", e);
-            }
-        };
+        }
     }
     Ok(())
 }
