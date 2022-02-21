@@ -115,7 +115,13 @@ async fn host_and_mux(cli: Opt, shutdown_signal: triggered::Listener) -> Result 
                                 debug!(logger, "Forwarding Uplink");
                                 let mut packet = push_data::Packet::from_rxpk(rxpk.clone());
                                 packet.gateway_mac = gateway_mac;
-                                            sender.send(packet).await?;
+                                let logger = logger.clone();
+                                let sender = sender.clone();
+                                tokio::spawn ( async move {
+                                    if let Err(e) = sender.send(packet).await {
+                                        error!(logger, "Error sending to {gateway_mac}: {e}")
+                                    }
+                                });
                             }
                         }
                     }
@@ -183,26 +189,33 @@ async fn run_client_instance_handle_downlink(
 
     while let Some(downlink_request) = receiver.recv().await {
         let prepared_send = client_tx.prepare_downlink(Some(downlink_request.txpk().clone()), mac);
-        match prepared_send.dispatch(Some(Duration::from_secs(5))).await {
-            Err(server_runtime::Error::Ack(e)) => {
-                error!(&logger, "Error Downlinking to {mac}: {:?}", e);
-                downlink_request.nack(e).await?;
+        let mac = mac.clone();
+        let logger = logger.clone();
+        tokio::spawn(async move {
+            if let Err(e) = match prepared_send.dispatch(Some(Duration::from_secs(5))).await {
+                Err(server_runtime::Error::Ack(e)) => {
+                    error!(&logger, "Error Downlinking to {mac}: {:?}", e);
+                    downlink_request.nack(e).await
+                }
+                Err(server_runtime::Error::SendTimeout) => {
+                    warn!(
+                        &logger,
+                        "Gateway {mac} did not ACK or NACK. Packet forward may not be connected?"
+                    );
+                    downlink_request.nack(tx_ack::Error::SendFail).await
+                }
+                Ok(()) => {
+                    debug!(&logger, "Downlink to {mac} successful");
+                    downlink_request.ack().await
+                }
+                Err(e) => {
+                    error!(&logger, "Unhandled downlink error: {:?}", e);
+                    Ok(())
+                }
+            } {
+                debug!(&logger, "Error sending downlink to {mac}: {e}");
             }
-            Err(server_runtime::Error::SendTimeout) => {
-                warn!(
-                    &logger,
-                    "Gateway {mac} did not ACK or NACK. Packet forward may not be connected?"
-                );
-                downlink_request.nack(tx_ack::Error::SendFail).await?;
-            }
-            Ok(()) => {
-                debug!(&logger, "Downlink to {mac} successful");
-                downlink_request.ack().await?;
-            }
-            Err(e) => {
-                error!(&logger, "Unhandled downlink error: {:?}", e);
-            }
-        };
+        });
     }
     Ok(())
 }
