@@ -243,7 +243,7 @@ impl Tx {
                 let n = data.serialize(&mut buf)? as usize;
                 if self.socket_send.send(&buf[..n]).await.is_err() {
                     // back off of CPU
-                    sleep(Duration::from_secs(1)).await;
+                    sleep(Duration::from_millis(100)).await;
                 }
             }
         }
