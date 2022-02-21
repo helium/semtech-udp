@@ -60,25 +60,71 @@ async fn watch_for_shutdown() {
     }
 }
 
+struct Client {
+    shutdown_trigger: triggered::Trigger,
+    clients: Vec<(
+        client_runtime::ClientTx,
+        tokio::task::JoinHandle<std::result::Result<(), Error>>,
+    )>,
+}
+
+impl Client {
+    async fn create(
+        mac: MacAddress,
+        client_tx: &server_runtime::ClientTx,
+        client_list: &[String],
+    ) -> Result<Client> {
+        let logger = slog_scope::logger().new(o!());
+        let mut clients = Vec::new();
+        let (shutdown_trigger, shutdown_signal) = triggered::trigger();
+        for address in client_list {
+            let socket = SocketAddr::from_str(address)?;
+            let (sender, receiver, udp_runtime) =
+                client_runtime::UdpRuntime::new(mac, socket).await?;
+            info!(logger, "Connecting to server {socket} on behalf of {mac}",);
+            let handle = tokio::spawn(run_client_instance(
+                shutdown_signal.clone(),
+                udp_runtime,
+                client_tx.clone(),
+                receiver,
+                mac,
+            ));
+            clients.push((sender, handle));
+        }
+        Ok(Client {
+            shutdown_trigger,
+            clients,
+        })
+    }
+
+    async fn shutdown(self) -> Result {
+        let logger = slog_scope::logger().new(o!());
+        self.shutdown_trigger.trigger();
+        for (_client, handle) in self.clients {
+            if let Err(e) = handle.await {
+                error!(logger, "Error awaiting client instance shutdown: {e}")
+            }
+        }
+        Ok(())
+    }
+}
+
 async fn host_and_mux(cli: Opt, shutdown_signal: triggered::Listener) -> Result {
     let logger = slog_scope::logger().new(o!());
     let addr = SocketAddr::from(([0, 0, 0, 0], cli.host));
     info!(&logger, "Starting server: {addr}");
     let (mut client_rx, client_tx) = UdpRuntime::new(addr).await?.split();
 
-    let mut mux = HashMap::new();
+    let mut mux: HashMap<MacAddress, Client> = HashMap::new();
     info!(&logger, "Ready for clients");
-    let mut handles = Vec::new();
-    let client_shutdown_signal = shutdown_signal.clone();
+
     loop {
         let shutdown_signal = shutdown_signal.clone();
         tokio::select!(
              _ = shutdown_signal => {
                 info!(&logger, "Awaiting mux-client instances shutdown");
-                for handle in handles {
-                    if let Err(e) = handle.await {
-                        error!(&logger, "Error awaiting client instance shutdown: {e}")
-                    }
+                for (_, client) in mux.into_iter() {
+                    client.shutdown().await?;
                 }
                 info!(&logger, "host_and_mux shutdown complete");
                 return Ok(());
@@ -92,20 +138,8 @@ async fn host_and_mux(cli: Opt, shutdown_signal: triggered::Listener) -> Result 
                     }
                     ServerEvent::NewClient((mac, addr)) => {
                         info!(logger, "New packet forwarder client: {mac}, {addr}");
-                        let mut clients = Vec::new();
-                        for address in &cli.client {
-                            let socket = SocketAddr::from_str(address)?;
-                            let (sender, receiver, udp_runtime) =
-                                client_runtime::UdpRuntime::new(mac, socket).await?;
-                            info!(
-                                &logger,
-                                "Connecting to server {socket} on behalf of {mac}",
-                            );
-                            let handle = tokio::spawn(run_client_instance(client_shutdown_signal.clone(),udp_runtime, client_tx.clone(), receiver, mac));
-                            clients.push(sender);
-                            handles.push(handle);
-                        }
-                        mux.insert(mac, clients);
+                        let client = Client::create(mac, &client_tx, &cli.client).await?;
+                        mux.insert(mac, client);
                     }
                     ServerEvent::UpdateClient((mac, addr)) => {
                         info!(logger, "Mac existed, but IP updated: {mac}, {addr}");
@@ -122,12 +156,15 @@ async fn host_and_mux(cli: Opt, shutdown_signal: triggered::Listener) -> Result 
                         warn!(logger, "Downlink sent but unknown mac: {mac}");
                     }
                     ServerEvent::ClientDisconnected((mac, addr)) => {
-                        warn!(logger, "Mac {mac} disconnected from {addr}");
+                        info!(logger, "Mac {mac} disconnected from {addr}");
+                        if let Some(client) = mux.remove(&mac) {
+                            client.shutdown().await?;
+                        }
                     }
                 }
                 if let Some(packet) = to_send {
-                    if let Some(clients) = mux.get_mut(&packet.gateway_mac) {
-                        for sender in clients {
+                    if let Some(client) = mux.get_mut(&packet.gateway_mac) {
+                        for (sender, _handle) in &client.clients {
                             debug!(logger, "Forwarding Uplink");
                             let logger = logger.clone();
                             let sender = sender.clone();
