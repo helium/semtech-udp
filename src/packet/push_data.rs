@@ -28,11 +28,11 @@ pub struct Packet {
 }
 
 impl Packet {
-    pub fn from_rxpk(rxpk: RxPk) -> Packet {
+    pub fn from_rxpk(gateway_mac: MacAddress, rxpk: RxPk) -> Packet {
         let rxpk = vec![rxpk];
         Packet {
             random_token: 0,
-            gateway_mac: MacAddress::from([0; 8]),
+            gateway_mac,
             data: Data {
                 rxpk: Some(rxpk),
                 stat: None,
@@ -40,10 +40,10 @@ impl Packet {
         }
     }
 
-    pub fn from_stat(stat: Stat) -> Packet {
+    pub fn from_stat(gateway_mac: MacAddress, stat: Stat) -> Packet {
         Packet {
             random_token: 0,
-            gateway_mac: MacAddress::from([0; 8]),
+            gateway_mac,
             data: Data {
                 rxpk: None,
                 stat: Some(stat),
