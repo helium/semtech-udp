@@ -156,7 +156,7 @@ async fn host_and_mux(cli: Opt, shutdown_signal: triggered::Listener) -> Result 
                         warn!(logger, "Downlink sent but unknown mac: {mac}");
                     }
                     ServerEvent::ClientDisconnected((mac, addr)) => {
-                        info!(logger, "Mac {mac} disconnected from {addr}");
+                        info!(logger, "{mac} disconnected from {addr}");
                         if let Some(client) = mux.remove(&mac) {
                             client.shutdown().await?;
                         }
