@@ -27,6 +27,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::UpdateClient((mac, addr)) => {
                 println!("Mac existed, but IP updated: {mac}, {addr}");
             }
+            Event::ClientDisconnected((mac, addr)) => {
+                println!("Client disconnected: {mac}, {addr}");
+            }
             Event::PacketReceived(rxpk, gateway_mac) => {
                 println!("{:?}", rxpk);
 
