@@ -29,6 +29,7 @@ struct Rx {
 struct Tx {
     mac: MacAddress,
     receiver: Receiver<TxMessage>,
+    client_sender: mpsc::Sender<Event>,
     socket_send: Arc<UdpSocket>,
 }
 
@@ -42,6 +43,8 @@ pub type ClientRx = mpsc::Receiver<Event>;
 
 #[derive(Debug)]
 pub enum Event {
+    Reconnected,
+    LostConnection,
     DownlinkRequest(DownlinkRequest),
     UnableToParseUdpFrame(ParseError, Vec<u8>),
 }
@@ -125,13 +128,14 @@ impl UdpRuntime {
             UdpRuntime {
                 rx: Rx {
                     mac,
-                    client_sender: downlink_request_tx,
+                    client_sender: downlink_request_tx.clone(),
                     udp_sender: tx_sender.clone(),
                     socket_recv,
                 },
                 poll_sender: tx_sender,
                 tx: Tx {
                     mac,
+                    client_sender: downlink_request_tx,
                     receiver: tx_receiver,
                     socket_send,
                 },
@@ -211,7 +215,7 @@ impl Rx {
                 }
                 Err(_) => {
                     // back off of CPU
-                    sleep(Duration::from_secs(10)).await;
+                    sleep(Duration::from_millis(100)).await;
                 }
             }
         }
@@ -221,6 +225,7 @@ impl Rx {
 impl Tx {
     pub async fn run(mut self) -> Result {
         let mut buf = vec![0u8; 1024];
+        let mut connected = true;
         loop {
             let tx = self.receiver.recv().await;
             if let Some(mut data) = tx {
@@ -241,9 +246,20 @@ impl Tx {
                 }
 
                 let n = data.serialize(&mut buf)? as usize;
-                if self.socket_send.send(&buf[..n]).await.is_err() {
-                    // back off of CPU
-                    sleep(Duration::from_millis(100)).await;
+
+                match self.socket_send.send(&buf[..n]).await {
+                    Ok(_) => {
+                        if !connected {
+                            connected = true;
+                            self.client_sender.send(Event::Reconnected);
+                        }
+                    }
+                    Err(_) => {
+                        if connected {
+                            connected = false;
+                            self.client_sender.send(Event::LostConnection);
+                        }
+                    }
                 }
             }
         }
