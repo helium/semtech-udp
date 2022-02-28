@@ -29,6 +29,8 @@ enum InternalEvent {
     UnableToParseUdpFrame(ParseError, Vec<u8>),
     AckReceived(TxAck),
     CheckCache,
+    FailedSend((Box<pull_resp::Packet>, MacAddress)),
+    SuccessSend((u16, oneshot::Sender<TxAck>)),
 }
 
 #[derive(Debug)]
@@ -64,6 +66,7 @@ struct UdpRx {
 
 // processes Internal Events and Transmit over UDP
 struct Internal {
+    self_sender: mpsc::Sender<InternalEvent>,
     receiver: mpsc::Receiver<InternalEvent>,
     client_tx_sender: mpsc::Sender<Event>,
     clients: HashMap<MacAddress, Client>,
@@ -220,10 +223,11 @@ impl UdpRuntime {
 
         let udp_rx = UdpRx {
             socket_receiver,
-            internal_sender: udp_tx_sender,
+            internal_sender: udp_tx_sender.clone(),
         };
 
         let udp_tx = Internal {
+            self_sender: udp_tx_sender,
             receiver: udp_tx_receiver,
             client_tx_sender,
             clients: HashMap::new(),
@@ -407,31 +411,34 @@ impl Internal {
                             .await?;
                     }
                     InternalEvent::Downlink((packet, mac, ack_sender)) => {
-                        let mut no_client = true;
-
                         if let Some(client) = self.clients.get(&mac) {
+                            // we spawn off here because one slow client can slow down all of the
+                            // event processing
                             let n = packet.serialize(&mut buf)? as usize;
-                            // We receive an error here if we are trying to send the packet to a
-                            // client that is no longer connected to us. Delete the client from map
-                            if self
-                                .socket_sender
-                                .send_to(&buf[..n], client.addr())
-                                .await
-                                .is_err()
-                            {
-                                // Client not connected
-                                self.client_tx_sender
-                                    .send(Event::ClientDisconnected((mac, *client.addr())))
-                                    .await?;
-                                self.clients.remove(&mac);
-                            } else {
-                                // store token and one-shot channel
-                                self.downlink_senders
-                                    .insert(packet.random_token, ack_sender);
-                                no_client = false;
-                            }
-                        }
-                        if no_client {
+                            let buf = Vec::from(&buf[..n]);
+                            let socket_sender = self.socket_sender.clone();
+                            let client_addr = *client.addr();
+                            let self_sender = self.self_sender.clone();
+                            tokio::spawn(async move {
+                                match socket_sender.send_to(&buf, client_addr).await {
+                                    Err(_) => {
+                                        self_sender
+                                            .send(InternalEvent::FailedSend((packet.into(), mac)))
+                                            .await
+                                            .unwrap();
+                                    }
+                                    Ok(_) => {
+                                        self_sender
+                                            .send(InternalEvent::SuccessSend((
+                                                packet.random_token,
+                                                ack_sender,
+                                            )))
+                                            .await
+                                            .unwrap();
+                                    }
+                                }
+                            });
+                        } else {
                             self.client_tx_sender
                                 .send(Event::NoClientWithMac(packet.into(), mac))
                                 .await?;
@@ -469,6 +476,15 @@ impl Internal {
                                 .send(Event::NewClient((mac, addr)))
                                 .await?;
                         }
+                    }
+                    InternalEvent::SuccessSend((random_token, ack_sender)) => {
+                        self.downlink_senders.insert(random_token, ack_sender);
+                    }
+                    InternalEvent::FailedSend((packet, mac)) => {
+                        self.clients.remove(&mac);
+                        self.client_tx_sender
+                            .send(Event::NoClientWithMac(packet, mac))
+                            .await?;
                     }
                 }
             }

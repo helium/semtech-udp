@@ -33,6 +33,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     while let Some(event) = downlink_request_receiver.recv().await {
         match event {
+            Event::LostConnection => {
+                println!("Lost connection to GWMP client");
+            }
+            Event::Reconnected => {
+                println!("Reconnected to GWMP client");
+            }
             Event::DownlinkRequest(downlink_request) => downlink_request.ack().await?,
             Event::UnableToParseUdpFrame(parse_error, _buffer) => {
                 println!("Error parsing UDP frame {}", parse_error)

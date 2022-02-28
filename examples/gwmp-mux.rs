@@ -274,6 +274,15 @@ async fn run_client_instance_handle_downlink(
                     "Error parsing frame from {mac}: {parse_error}, {buffer:?}"
                 );
             }
+            ClientEvent::LostConnection => {
+                warn!(
+                    &logger,
+                    "Lost connection to GWMP client {mac}. Dropping frames."
+                )
+            }
+            ClientEvent::Reconnected => {
+                warn!(&logger, "Reconnected to GWMP client {mac}")
+            }
         }
     }
     Ok(())
