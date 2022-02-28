@@ -251,13 +251,13 @@ impl Tx {
                     Ok(_) => {
                         if !connected {
                             connected = true;
-                            self.client_sender.send(Event::Reconnected);
+                            self.client_sender.send(Event::Reconnected).await?;
                         }
                     }
                     Err(_) => {
                         if connected {
                             connected = false;
-                            self.client_sender.send(Event::LostConnection);
+                            self.client_sender.send(Event::LostConnection).await?;
                         }
                     }
                 }
