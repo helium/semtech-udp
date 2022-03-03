@@ -242,28 +242,29 @@ async fn run_client_instance_handle_downlink(
                     client_tx.prepare_downlink(Some(downlink_request.txpk().clone()), mac);
                 let logger = logger.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = match prepared_send.dispatch(Some(Duration::from_secs(5))).await
-                    {
-                        Err(server_runtime::Error::Ack(e)) => {
-                            error!(&logger, "Error Downlinking to {mac}: {:?}", e);
-                            downlink_request.nack(e).await
-                        }
-                        Err(server_runtime::Error::SendTimeout) => {
-                            warn!(
+                    if let Err(e) =
+                        match prepared_send.dispatch(Some(Duration::from_secs(15))).await {
+                            Err(server_runtime::Error::Ack(e)) => {
+                                error!(&logger, "Error Downlinking to {mac}: {:?}", e);
+                                downlink_request.nack(e).await
+                            }
+                            Err(server_runtime::Error::SendTimeout) => {
+                                warn!(
                         &logger,
                         "Gateway {mac} did not ACK or NACK. Packet forward may not be connected?"
                     );
-                            downlink_request.nack(tx_ack::Error::SendFail).await
+                                downlink_request.nack(tx_ack::Error::SendFail).await
+                            }
+                            Ok(()) => {
+                                debug!(&logger, "Downlink to {mac} successful");
+                                downlink_request.ack().await
+                            }
+                            Err(e) => {
+                                error!(&logger, "Unhandled downlink error: {:?}", e);
+                                Ok(())
+                            }
                         }
-                        Ok(()) => {
-                            debug!(&logger, "Downlink to {mac} successful");
-                            downlink_request.ack().await
-                        }
-                        Err(e) => {
-                            error!(&logger, "Unhandled downlink error: {:?}", e);
-                            Ok(())
-                        }
-                    } {
+                    {
                         debug!(&logger, "Error sending downlink to {mac}: {e}");
                     }
                 });

@@ -446,7 +446,9 @@ impl Internal {
                     }
                     InternalEvent::AckReceived(txack) => {
                         if let Some(sender) = self.downlink_senders.remove(&txack.random_token) {
-                            sender.send(txack).map_err(|_| Error::AckSend)?;
+                            // we may have received an ACK on a transmit that timed out already
+                            // therefore, this send may fail.
+                            let _ = sender.send(txack);
                         }
                     }
                     InternalEvent::PacketBySocket((packet, addr)) => {
