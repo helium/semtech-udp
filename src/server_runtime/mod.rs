@@ -1,6 +1,6 @@
 use super::{
-    parser::Parser, pull_resp, pull_resp::TxPk, tx_ack::Packet as TxAck, MacAddress, Packet,
-    ParseError, SerializablePacket, Up,
+    pull_resp, pull_resp::TxPk, tx_ack::Packet as TxAck, MacAddress, Packet, ParseError,
+    SerializablePacket, Up,
 };
 pub use crate::push_data::{RxPk, Stat};
 use std::sync::Arc;
@@ -279,7 +279,7 @@ impl UdpRx {
                 match self.socket_receiver.recv_from(&mut buf).await {
                     Err(e) => return Err(e.into()),
                     Ok((n, src)) => {
-                        let packet = match Packet::parse(&buf[0..n]) {
+                        let packet = match Packet::parse_uplink(&buf[0..n]) {
                             Ok(packet) => Some(packet),
                             Err(e) => {
                                 let mut vec = Vec::new();
@@ -292,68 +292,61 @@ impl UdpRx {
                         };
                         if let Some(packet) = packet {
                             match packet {
-                                Packet::Up(packet) => {
-                                    match packet {
-                                        Up::PullData(pull_data) => {
-                                            let mac = pull_data.gateway_mac;
-                                            // first send (mac, addr) to update map owned by UdpRuntimeTx
-                                            let client = (mac, src);
-                                            self.internal_sender
-                                                .send(InternalEvent::Client(client))
-                                                .await?;
+                                Up::PullData(pull_data) => {
+                                    let mac = pull_data.gateway_mac;
+                                    // first send (mac, addr) to update map owned by UdpRuntimeTx
+                                    let client = (mac, src);
+                                    self.internal_sender
+                                        .send(InternalEvent::Client(client))
+                                        .await?;
 
-                                            // send the ack_packet
-                                            let ack_packet = pull_data.into_ack();
+                                    // send the ack_packet
+                                    let ack_packet = pull_data.into_ack();
+                                    self.internal_sender
+                                        .send(InternalEvent::PacketBySocket((
+                                            ack_packet.into(),
+                                            src,
+                                        )))
+                                        .await?
+                                }
+                                Up::TxAck(txack) => {
+                                    self.internal_sender
+                                        .send(InternalEvent::AckReceived(txack))
+                                        .await?;
+                                }
+                                Up::PushData(push_data) => {
+                                    // Send all received packets as RxPk Events
+                                    if let Some(rxpk) = &push_data.data.rxpk {
+                                        for packet in rxpk {
                                             self.internal_sender
-                                                .send(InternalEvent::PacketBySocket((
-                                                    ack_packet.into(),
-                                                    src,
-                                                )))
-                                                .await?
-                                        }
-                                        Up::TxAck(txack) => {
-                                            self.internal_sender
-                                                .send(InternalEvent::AckReceived(txack))
-                                                .await?;
-                                        }
-                                        Up::PushData(push_data) => {
-                                            // Send all received packets as RxPk Events
-                                            if let Some(rxpk) = &push_data.data.rxpk {
-                                                for packet in rxpk {
-                                                    self.internal_sender
-                                                        .send(InternalEvent::PacketReceived(
-                                                            packet.clone(),
-                                                            push_data.gateway_mac,
-                                                        ))
-                                                        .await?;
-                                                }
-                                            }
-
-                                            if let Some(stat) = &push_data.data.stat {
-                                                self.internal_sender
-                                                    .send(InternalEvent::StatReceived(
-                                                        stat.clone(),
-                                                        push_data.gateway_mac,
-                                                    ))
-                                                    .await?;
-                                            }
-
-                                            let socket_addr = src;
-                                            // send the ack_packet
-                                            let ack_packet = push_data.into_ack();
-                                            self.internal_sender
-                                                .send(InternalEvent::PacketBySocket((
-                                                    ack_packet.into(),
-                                                    socket_addr,
-                                                )))
+                                                .send(InternalEvent::PacketReceived(
+                                                    packet.clone(),
+                                                    push_data.gateway_mac,
+                                                ))
                                                 .await?;
                                         }
                                     }
+
+                                    if let Some(stat) = &push_data.data.stat {
+                                        self.internal_sender
+                                            .send(InternalEvent::StatReceived(
+                                                stat.clone(),
+                                                push_data.gateway_mac,
+                                            ))
+                                            .await?;
+                                    }
+
+                                    let socket_addr = src;
+                                    // send the ack_packet
+                                    let ack_packet = push_data.into_ack();
+                                    self.internal_sender
+                                        .send(InternalEvent::PacketBySocket((
+                                            ack_packet.into(),
+                                            socket_addr,
+                                        )))
+                                        .await?;
                                 }
-                                Packet::Down(_) => {
-                                    panic!("Should not receive this frame from forwarder")
-                                }
-                            };
+                            }
                         }
                     }
                 }
