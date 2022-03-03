@@ -336,7 +336,7 @@ pub struct Stat {
     #[serde(skip_serializing_if = "Option::is_none")]
     long: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    alti: Option<u64>,
+    alti: Option<i64>,
     rxnb: u64,
     rxok: u64,
     rxfw: u64,
