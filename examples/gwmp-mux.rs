@@ -197,6 +197,7 @@ pub struct Opt {
     #[structopt(parse(from_str = parse_log), default_value = "info")]
     pub log_level: slog::Level,
 
+    /// Disable timestamp from logs
     #[structopt(long)]
     pub disable_timestamp: bool,
 }
