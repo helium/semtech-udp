@@ -29,7 +29,7 @@ pub struct Packet {
 
 impl Packet {
     pub fn get_result(&self) -> Result<(), Error> {
-        self.data.txpk_ack.error
+        self.data.get_result()
     }
 }
 
@@ -69,11 +69,61 @@ impl From<Packet> for super::Packet {
 // }}
 // ```
 
+/// We take all of the errors from the GWMP protocol.
+/// These are tolerated in both "warn" or "error" fields
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum ErrorField {
+    None,
+    TooLate,
+    TooEarly,
+    CollisionPacket,
+    CollisionBeacon,
+    TxFreq,
+    TxPower,
+    GpsUnlocked,
+    SendLBT,
+    SendFail,
+}
+
+use std::convert::Into;
+
+impl From<Result<(), Error>> for ErrorField {
+    fn from(other: Result<(), Error>) -> ErrorField {
+        match other {
+            Err(Error::TooLate) => ErrorField::TooLate,
+            Err(Error::TooEarly) => ErrorField::TooEarly,
+            Err(Error::CollisionPacket) => ErrorField::CollisionPacket,
+            Err(Error::CollisionBeacon) => ErrorField::CollisionBeacon,
+            Err(Error::InvalidTransmitFrequency) => ErrorField::TxFreq,
+            Err(Error::InvalidTransmitPower(_)) => ErrorField::TxPower,
+            Err(Error::GpsUnlocked) => ErrorField::GpsUnlocked,
+            Err(Error::SendLBT) => ErrorField::SendLBT,
+            Err(Error::SendFail) => ErrorField::SendFail,
+            _ => ErrorField::None,
+        }
+    }
+}
+
+impl From<ErrorField> for Result<(), Error> {
+    fn from(other: ErrorField) -> Self {
+        match other {
+            ErrorField::TooEarly => Err(Error::TooEarly),
+            ErrorField::CollisionPacket => Err(Error::CollisionPacket),
+            ErrorField::CollisionBeacon => Err(Error::CollisionBeacon),
+            ErrorField::TooLate => Err(Error::TooLate),
+            ErrorField::TxFreq => Err(Error::InvalidTransmitFrequency),
+            ErrorField::TxPower => Err(Error::InvalidTransmitPower(None)),
+            ErrorField::GpsUnlocked => Err(Error::GpsUnlocked),
+            ErrorField::SendLBT => Err(Error::SendLBT),
+            ErrorField::SendFail => Err(Error::SendFail),
+            ErrorField::None => Ok(()),
+        }
+    }
+}
+
 use thiserror::Error;
-/// We take all of the errors from the GWMP protocol
-/// except for the NONE response. We write a custom
-/// serializer and deserializer to accommodate that
-#[derive(Error, Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Error, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Error {
     #[error("TxAck::Error::TOO_LATE")]
     TooLate,
@@ -85,8 +135,8 @@ pub enum Error {
     CollisionBeacon,
     #[error("TxAck::Error::TX_FREQ")]
     InvalidTransmitFrequency,
-    #[error("TxAck::Error::TX_POWER")]
-    InvalidTransmitPower,
+    #[error("TxAck::Error::TX_POWER({0:?})")]
+    InvalidTransmitPower(Option<i32>),
     #[error("TxAck::Error::GPS_UNLOCKED")]
     GpsUnlocked,
     #[error("TxAck::Error::SEND_LBT")]
@@ -103,66 +153,105 @@ pub struct TxPkNack {
 impl Default for TxPkNack {
     fn default() -> Self {
         TxPkNack {
-            txpk_ack: SubTxPkAck { error: Ok(()) },
+            txpk_ack: SubTxPkAck::Error {
+                error: ErrorField::None,
+            },
         }
     }
 }
 
 impl TxPkNack {
     pub fn new_with_error(error: Error) -> TxPkNack {
-        TxPkNack {
-            txpk_ack: SubTxPkAck { error: Err(error) },
+        let txpk_ack = if let Error::InvalidTransmitPower(Some(v)) = error {
+            SubTxPkAck::Warn {
+                warn: ErrorField::from(Err(error)),
+                value: Some(v),
+            }
+        } else {
+            SubTxPkAck::Error {
+                error: ErrorField::from(Err(error)),
+            }
+        };
+        TxPkNack { txpk_ack }
+    }
+
+    pub fn get_result(&self) -> Result<(), Error> {
+        match &self.txpk_ack {
+            SubTxPkAck::Error { error } => {
+                let res: Result<(), Error> = (*error).into();
+                res
+            }
+            SubTxPkAck::Warn { warn, value } => {
+                if let ErrorField::TxPower = warn {
+                    Err(Error::InvalidTransmitPower(*value))
+                } else {
+                    (*warn).into()
+                }
+            }
         }
     }
 }
-#[derive(Debug, Serialize, Clone, Deserialize)]
-struct SubTxPkAck {
-    #[serde(deserialize_with = "deserialize", serialize_with = "serialize")]
-    pub error: Result<(), Error>,
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+enum SubTxPkAck {
+    Error {
+        error: ErrorField,
+    },
+    Warn {
+        warn: ErrorField,
+        value: Option<i32>,
+    },
 }
 
-/// Because `error: NONE` is possible, we write a custom serializer
-/// and deserializer that will provide Ok(()) the NONE case but the
-/// tx_ack::Error type in other cases
-use serde::{
-    de::{self, Deserializer},
-    Serializer,
-};
-pub fn deserialize<'de, D>(d: D) -> std::result::Result<Result<(), Error>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    match String::deserialize(d)?.as_str() {
-        "NONE" => Ok(Ok(())),
-        "TOO_LATE" => Ok(Err(Error::TooLate)),
-        "TOO_EARLY" => Ok(Err(Error::TooEarly)),
-        "COLLISION_PACKET" => Ok(Err(Error::CollisionPacket)),
-        "COLLISION_BEACON" => Ok(Err(Error::CollisionBeacon)),
-        "TX_FREQ" => Ok(Err(Error::InvalidTransmitFrequency)),
-        "TX_POWER" => Ok(Err(Error::InvalidTransmitPower)),
-        "GPS_UNLOCKED" => Ok(Err(Error::GpsUnlocked)),
-        "SEND_LBT" => Ok(Err(Error::SendLBT)),
-        "SEND_FAIL" => Ok(Err(Error::SendFail)),
-        _ => Err(de::Error::custom(
-            "Unexpected String in txpk_ack.error field",
-        )),
+#[test]
+fn tx_nack_too_late() {
+    let json = "{\"txpk_ack\": { \"error\": \"TOO_LATE\"}}";
+    let parsed: TxPkNack = serde_json::from_str(json).expect("Error parsing tx_ack");
+    if let Err(Error::TooLate) = parsed.get_result() {
+    } else {
+        assert!(false);
     }
 }
 
-fn serialize<S>(res: &Result<(), Error>, s: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    match res {
-        Ok(()) => s.serialize_str("NONE"),
-        Err(Error::TooLate) => s.serialize_str("TOO_LATE"),
-        Err(Error::TooEarly) => s.serialize_str("TOO_EARLY"),
-        Err(Error::CollisionPacket) => s.serialize_str("COLLISION_PACKET"),
-        Err(Error::CollisionBeacon) => s.serialize_str("COLLISION_BEACON"),
-        Err(Error::InvalidTransmitFrequency) => s.serialize_str("TX_FREQ"),
-        Err(Error::InvalidTransmitPower) => s.serialize_str("TX_POWER"),
-        Err(Error::GpsUnlocked) => s.serialize_str("GPS_UNLOCKED"),
-        Err(Error::SendLBT) => s.serialize_str("SEND_LBT"),
-        Err(Error::SendFail) => s.serialize_str("SEND_FAIL"),
+#[test]
+fn tx_ack_deser() {
+    let json = "{\"txpk_ack\":{\"error\":\"NONE\"}}";
+    let parsed: TxPkNack = serde_json::from_str(json).expect("Error parsing tx_ack");
+    if let Err(_) = parsed.get_result() {
+        assert!(false);
     }
+}
+
+#[test]
+fn tx_nack_tx_power_legacy() {
+    let json = "{ \"txpk_ack\": { \"error\" : \"TX_POWER\"}}";
+    let parsed: TxPkNack = serde_json::from_str(json).expect("Error parsing tx_ack");
+    if let Err(Error::InvalidTransmitPower(v)) = parsed.get_result() {
+        assert!(v.is_none());
+    } else {
+        assert!(false);
+    }
+}
+
+#[test]
+fn tx_nack_tx_power_sx1302deser() {
+    let json = "{ \"txpk_ack\": { \"warn\" : \"TX_POWER\", \"value\" : 27 }}";
+    let parsed: TxPkNack = serde_json::from_str(json).expect("Error parsing tx_ack");
+    if let Err(Error::InvalidTransmitPower(v)) = parsed.get_result() {
+        if let Some(v) = v {
+            assert_eq!(v, 27)
+        } else {
+            assert!(false)
+        }
+    } else {
+        assert!(false)
+    }
+}
+
+#[test]
+fn tx_nack_tx_power_sx1302_ser() {
+    let invalid_transmit_power = TxPkNack::new_with_error(Error::InvalidTransmitPower(Some(27)));
+    let str = serde_json::to_string(&invalid_transmit_power).expect("serialization error");
+    assert_eq!("{\"txpk_ack\":{\"warn\":\"TX_POWER\",\"value\":27}}", str)
 }
