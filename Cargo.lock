@@ -384,7 +384,7 @@ checksum = "73b4b750c782965c211b42f022f59af1fbceabdd026623714f104152f1ec149f"
 
 [[package]]
 name = "semtech-udp"
-version = "0.9.4-alpha.0"
+version = "0.9.4"
 dependencies = [
  "arrayref",
  "base64",
