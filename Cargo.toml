@@ -20,10 +20,6 @@ required-features = ["server"]
 name = "client"
 required-features = ["client"]
 
-[[example]]
-name = "gwmp-mux"
-required-features = ["client", "server"]
-
 [dependencies]
 arrayref = "0"
 base64 = "0"
@@ -39,19 +35,13 @@ triggered  = "0"
 
 [dev-dependencies]
 structopt = { version = "0.3.2", default-features = false }
-slog = "2"
-slog-async = "2"
-slog-term = "2"
-slog-syslog = "0"
-slog-scope = "4"
-slog-stdlog = "4"
+
 
 [dev-dependencies.tokio]
 version = "1"
-features = ["macros", "sync", "time", "rt-multi-thread", "io-std", "io-util", "signal"]
+features = ["macros", "sync", "time", "rt-multi-thread"]
 
 [features]
 default = []
 server = ["tokio"]
 client = ["tokio"]
-
