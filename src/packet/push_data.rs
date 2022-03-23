@@ -199,6 +199,7 @@ pub struct RSig {
     pub ant: usize,
     pub chan: u64,
     pub rssic: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rssis: Option<i32>,
     pub lsnr: f32,
     pub etime: Option<String>,
