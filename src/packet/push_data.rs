@@ -255,7 +255,7 @@ impl RxPk {
                 .iter()
                 // truncate the decimal when choosing best LSNR value
                 .fold(-150.0, |max, x| {
-                    if (max as u32) < (x.lsnr as u32) {
+                    if (max as i32) < (x.lsnr as i32) {
                         x.lsnr
                     } else {
                         max
