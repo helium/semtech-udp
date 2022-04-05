@@ -371,3 +371,37 @@ impl Packet {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn check_given_snr(data: Data, expected_snr: f32) {
+        if let Some(mut rxpk) = data.rxpk {
+            assert_eq!(rxpk.len(), 1);
+            if let Some(rxpk) = rxpk.pop() {
+                assert_eq!(rxpk.get_snr(), expected_snr)
+            } else {
+                // rxpk is empty vector
+                assert!(false)
+            }
+        } else {
+            // rxpk is None
+            assert!(false)
+        }
+    }
+
+    #[test]
+    fn rxpk_positive_lsnr() {
+        let json = "{\"rxpk\":[{\"aesk\":0,\"brd\":263,\"codr\":\"4/5\",\"data\":\"QC65rwEA4w8CaH7LyGf/3+dxzrXkkfEsRCcXbFM=\",\"datr\":\"SF12BW125\",\"freq\":868.5,\"jver\":2,\"modu\":\"LORA\",\"rsig\":[{\"ant\":0,\"chan\":7,\"lsnr\":7.8,\"rssic\":-103}],\"size\":29,\"stat\":1,\"time\":\"2022-03-31T07:51:15.709338Z\",\"tmst\":445296860}]}";
+        let parsed: Data = serde_json::from_str(json).expect("Error parsing push_data::Data");
+        check_given_snr(parsed, 7.8);
+    }
+
+    #[test]
+    fn rxpk_negative_lsnr() {
+        let json = "{\"rxpk\":[{\"aesk\":0,\"brd\":261,\"codr\":\"4/5\",\"data\":\"QI8cACQA6iAD3TTei0kPKKyxBA==\",\"datr\":\"SF11BW125\",\"freq\":868.1,\"jver\":2,\"modu\":\"LORA\",\"rsig\":[{\"ant\":0,\"chan\":5,\"lsnr\":-3.5,\"rssic\":-120}],\"size\":19,\"stat\":1,\"time\":\"2022-03-31T07:51:12.631018Z\",\"tmst\":442218540}]}";
+        let parsed: Data = serde_json::from_str(json).expect("Error parsing push_data::Data");
+        check_given_snr(parsed, -3.5);
+    }
+}
