@@ -54,7 +54,7 @@ pub enum Event {
 #[derive(Debug)]
 pub struct DownlinkRequest {
     mac: MacAddress,
-    pull_resp: pull_resp::Packet,
+    pub pull_resp: pull_resp::Packet,
     udp_sender: Sender<TxMessage>,
 }
 
