@@ -89,8 +89,9 @@ impl Data {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TxPk {
-    pub imme: bool,        // Send packet immediately (will ignore tmst & time)
-    pub tmst: StringOrNum, // Send packet on a certain timestamp value (will ignore time)
+    pub imme: bool, // Send packet immediately (will ignore tmst & time)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tmst: Option<StringOrNum>, // Send packet on a certain timestamp value (will ignore time)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tmms: Option<StringOrNum>, // Send packet at a certain GPS time (GPS synchronization required)
     pub freq: f64,        // TX central frequency in MHz (unsigned float, Hz precision)
@@ -110,13 +111,27 @@ pub struct TxPk {
     pub ncrc: Option<bool>, // If true, disable the CRC of the physical layer (optional)
 }
 
+impl TxPk {
+    pub fn is_immediate(&self) -> bool {
+        self.imme
+    }
+
+    pub fn get_tmst(&self) -> Option<u32> {
+        if let Some(StringOrNum::N(tmst)) = self.tmst {
+            Some(tmst)
+        } else {
+            None
+        }
+    }
+}
+
 use std::fmt;
 impl fmt::Display for TxPk {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "{}, {:.2} MHz, {:?}, len: {}",
-            if let StringOrNum::N(time) = self.tmst {
+            if let Some(StringOrNum::N(time)) = self.tmst {
                 format!("@{} us", time)
             } else {
                 "immediately".into()

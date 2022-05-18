@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let txpk = pull_resp::TxPk {
                     imme: true,
-                    tmst,
+                    tmst: Some(tmst),
                     freq: cli.frequency,
                     rfch: 0,
                     powe: cli.power as u64,
