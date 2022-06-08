@@ -97,6 +97,19 @@ pub mod data_rate {
         }
     }
 
+    impl SpreadingFactor {
+        pub fn to_u8(&self) -> u8 {
+            match self {
+                Self::SF7 => 7,
+                Self::SF8 => 8,
+                Self::SF9 => 9,
+                Self::SF10 => 10,
+                Self::SF11 => 11,
+                Self::SF12 => 12,
+            }
+        }
+    }
+
     #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
     pub enum Bandwidth {
         BW125,
@@ -131,6 +144,16 @@ pub mod data_rate {
     impl Default for Bandwidth {
         fn default() -> Self {
             Bandwidth::BW250
+        }
+    }
+
+    impl Bandwidth {
+        pub fn to_hz(&self) -> u32 {
+            match self {
+                Self::BW125 => 125_000,
+                Self::BW250 => 250_000,
+                Self::BW500 => 500_000,
+            }
         }
     }
 
