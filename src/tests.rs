@@ -231,3 +231,15 @@ fn new_parsing_error() {
         assert!(false)
     }
 }
+
+#[test]
+fn tx_ack_no_json() {
+    let recv = [2, 139, 165, 5, 114, 118, 255, 0, 57, 3, 0, 174, 0];
+
+    // the unwrap is enough for the test here
+    if let Ok(Packet::Up(Up::TxAck(packet))) = Packet::parse(&recv) {
+        assert!(packet.get_result().is_ok())
+    } else {
+        assert!(false)
+    }
+}
