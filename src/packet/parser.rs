@@ -76,14 +76,22 @@ impl Parser for Packet {
                     Identifier::TxAck => {
                         let gateway_mac = gateway_mac(&buffer[..PACKET_PAYLOAD_START]);
                         let data = if buffer.len() > PACKET_PAYLOAD_START {
-                            let json_str = std::str::from_utf8(&buffer[PACKET_PAYLOAD_START..])?;
-                            serde_json::from_str(json_str).map_err(|json_error| {
-                                ParseError::InvalidJson {
-                                    identifier: id,
-                                    json_str: json_str.into(),
-                                    json_error,
-                                }
-                            })?
+                            // guard against some packet forwarders that put a 0 byte as the last byte
+                            if buffer.len() == PACKET_PAYLOAD_START + 1
+                                && buffer[PACKET_PAYLOAD_START] == 0
+                            {
+                                TxPkNack::default()
+                            } else {
+                                let json_str =
+                                    std::str::from_utf8(&buffer[PACKET_PAYLOAD_START..])?;
+                                serde_json::from_str(json_str).map_err(|json_error| {
+                                    ParseError::InvalidJson {
+                                        identifier: id,
+                                        json_str: json_str.into(),
+                                        json_error,
+                                    }
+                                })?
+                            }
                         } else {
                             TxPkNack::default()
                         };
