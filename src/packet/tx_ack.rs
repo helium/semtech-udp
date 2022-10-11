@@ -136,7 +136,7 @@ impl From<ErrorField> for Result<(), Error> {
 }
 
 use thiserror::Error;
-#[derive(Debug, Error, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Error {
     #[error("TxAck::Error::TOO_LATE")]
     TooLate,
