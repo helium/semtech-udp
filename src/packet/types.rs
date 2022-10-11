@@ -7,7 +7,7 @@ pub mod data_rate {
     use std::cmp::PartialEq;
     use std::str::FromStr;
     use std::string::ToString;
-    #[derive(Debug, Clone, Default, PartialEq)]
+    #[derive(Debug, Clone, Default, PartialEq, Eq)]
     pub struct DataRate(SpreadingFactor, Bandwidth);
 
     impl DataRate {
@@ -66,7 +66,7 @@ pub mod data_rate {
         }
     }
 
-    #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+    #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
     pub enum SpreadingFactor {
         SF7,
         SF8,
@@ -110,7 +110,7 @@ pub mod data_rate {
         }
     }
 
-    #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+    #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
     pub enum Bandwidth {
         BW125,
         BW250,
