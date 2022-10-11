@@ -167,6 +167,7 @@ pub struct Data {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TxPkAck {
+    #[serde(skip_serializing_if = "Option::is_none")]
     tmst: Option<u32>,
     #[serde(flatten)]
     result: TxPkAckResult,
@@ -229,6 +230,7 @@ enum TxPkAckResult {
     },
     Warn {
         warn: ErrorField,
+        #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<i32>,
     },
 }
