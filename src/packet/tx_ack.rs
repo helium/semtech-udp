@@ -150,6 +150,8 @@ pub enum Error {
     InvalidTransmitFrequency,
     #[error("TxAck::Error::TX_POWER({0:?})")]
     InvalidTransmitPower(Option<i32>),
+    #[error("TxAck::Error::ADJUSTED_TX_POWER({0:?})")]
+    AdjustedTransmitPower(Option<i32>),
     #[error("TxAck::Error::GPS_UNLOCKED")]
     GpsUnlocked,
     #[error("TxAck::Error::SEND_LBT")]
@@ -195,8 +197,10 @@ impl Data {
                 res
             }
             TxPkAck::Warn { warn, value } => {
+                // We need special handling of the ErrorField when warning
+                // otherwise, the into will specify it as InvalidTransmitPower
                 if let ErrorField::TxPower = warn {
-                    Err(Error::InvalidTransmitPower(*value))
+                    Err(Error::AdjustedTransmitPower(*value))
                 } else {
                     (*warn).into()
                 }
@@ -251,7 +255,7 @@ fn tx_nack_tx_power_legacy() {
 fn tx_nack_tx_power_sx1302deser() {
     let json = "{ \"txpk_ack\": { \"warn\" : \"TX_POWER\", \"value\" : 27 }}";
     let parsed: Data = serde_json::from_str(json).expect("Error parsing tx_ack");
-    if let Err(Error::InvalidTransmitPower(v)) = parsed.get_result() {
+    if let Err(Error::AdjustedTransmitPower(v)) = parsed.get_result() {
         if let Some(v) = v {
             assert_eq!(v, 27)
         } else {
