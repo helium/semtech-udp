@@ -128,7 +128,7 @@ impl Downlink {
         self.mac
     }
 
-    async fn just_dispatch(self) -> Result {
+    async fn just_dispatch(self) -> Result<Option<u32>> {
         if let Some(packet) = self.packet {
             let (sender, receiver) = oneshot::channel();
 
@@ -143,7 +143,7 @@ impl Downlink {
         }
     }
 
-    pub async fn dispatch(self, timeout_duration: Option<Duration>) -> Result {
+    pub async fn dispatch(self, timeout_duration: Option<Duration>) -> Result<Option<u32>> {
         if let Some(duration) = timeout_duration {
             timeout(duration, self.just_dispatch()).await?
         } else {
@@ -161,7 +161,12 @@ impl ClientRx {
 }
 
 impl ClientTx {
-    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress, timeout: Option<Duration>) -> Result {
+    pub async fn send(
+        &mut self,
+        txpk: TxPk,
+        mac: MacAddress,
+        timeout: Option<Duration>,
+    ) -> Result<Option<u32>> {
         let prepared_send = self.prepare_downlink(Some(txpk), mac);
         prepared_send.dispatch(timeout).await
     }
@@ -189,7 +194,12 @@ impl UdpRuntime {
         (self.rx, self.tx)
     }
 
-    pub async fn send(&mut self, txpk: TxPk, mac: MacAddress, timeout: Option<Duration>) -> Result {
+    pub async fn send(
+        &mut self,
+        txpk: TxPk,
+        mac: MacAddress,
+        timeout: Option<Duration>,
+    ) -> Result<Option<u32>> {
         self.tx.send(txpk, mac, timeout).await
     }
 
