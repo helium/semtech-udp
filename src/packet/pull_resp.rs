@@ -104,11 +104,16 @@ pub struct TxPk {
     pub fdev: Option<u64>, //FSK frequency deviation (unsigned integer, in Hz)
     pub ipol: bool,       // Lora modulation polarization inversion
     pub prea: Option<u64>, // RF preamble size (unsigned integer)
-    pub size: u64,        // RF packet payload size in bytes (unsigned integer)
-    #[serde(with = "crate::packet::types::base64")]
-    pub data: Vec<u8>, // Data to be transmitted, as bytes
+    #[serde(flatten)]
+    pub data: PhyData,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ncrc: Option<bool>, // If true, disable the CRC of the physical layer (optional)
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PhyData {
+    #[serde(with = "crate::packet::types::base64")]
+    data: Vec<u8>,
+    size: usize,
 }
 
 impl TxPk {
@@ -138,7 +143,7 @@ impl fmt::Display for TxPk {
             },
             self.freq,
             self.datr,
-            self.size
+            self.data.size
         )
     }
 }
