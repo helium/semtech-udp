@@ -116,6 +116,25 @@ pub struct PhyData {
     size: usize,
 }
 
+impl AsRef<[u8]> for PhyData {
+    fn as_ref(&self) -> &[u8] {
+        self.data.as_ref()
+    }
+}
+
+impl PhyData {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self {
+            size: data.len(),
+            data,
+        }
+    }
+    pub fn set(&mut self, data: Vec<u8>) {
+        self.size = data.len();
+        self.data = data;
+    }
+}
+
 impl TxPk {
     pub fn is_immediate(&self) -> bool {
         self.imme

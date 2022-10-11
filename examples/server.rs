@@ -1,7 +1,8 @@
+use semtech_udp::pull_resp::PhyData;
 use semtech_udp::{
     pull_resp,
     server_runtime::{Event, UdpRuntime},
-    CodingRate, DataRate, Modulation, StringOrNum,
+    tx_ack, CodingRate, DataRate, Modulation, StringOrNum,
 };
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -34,7 +35,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("{:?}", rxpk);
 
                 let data = vec![1, 2, 3, 4];
-                let size = data.len() as u64;
                 let tmst = StringOrNum::N(rxpk.get_timestamp() + 1_000_000);
 
                 let txpk = pull_resp::TxPk {
@@ -47,8 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     datr: DataRate::default(),
                     codr: CodingRate::_4_5,
                     ipol: true,
-                    size,
-                    data,
+                    data: PhyData::new(data),
                     tmms: None,
                     fdev: None,
                     prea: None,
@@ -59,7 +58,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 tokio::spawn(async move {
                     if let Err(e) = prepared_send.dispatch(Some(Duration::from_secs(5))).await {
-                        panic!("Transmit Dispatch threw error: {e:?}")
+                        if let tx_ack::Error::AdjustedTransmitPower(adjusted_power) = e {
+                            // Generally, all packet forwarders will reduce output power to appropriate levels.
+                            // Packet forwarder may optionally indicate the actual power used.
+                            println!("Packet sent at adjusted power: {adjusted_power:?}")
+                        } else {
+                            println!("Transmit Dispatch threw error: {e:?}")
+                        }
                     } else {
                         println!("Send complete");
                     }

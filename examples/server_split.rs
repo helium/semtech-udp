@@ -1,7 +1,7 @@
 use semtech_udp::{
-    pull_resp,
-    server_runtime::{Event, UdpRuntime},
-    Bandwidth, CodingRate, DataRate, MacAddress, Modulation, SpreadingFactor, StringOrNum,
+    pull_resp::{self, PhyData},
+    server_runtime::{Error, Event, UdpRuntime},
+    tx_ack, Bandwidth, CodingRate, DataRate, MacAddress, Modulation, SpreadingFactor, StringOrNum,
 };
 use std::net::SocketAddr;
 use structopt::StructOpt;
@@ -31,7 +31,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             while cli.delay != 0 || first_shot {
                 first_shot = false;
                 let data = vec![0; cli.length];
-                let size = data.len() as u64;
                 let tmst = StringOrNum::S("immedate".into());
 
                 let txpk = pull_resp::TxPk {
@@ -44,8 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     datr: DataRate::new(cli.spreading_factor.clone(), cli.bandwidth.clone()),
                     codr: CodingRate::_4_5,
                     ipol: cli.polarization_inversion,
-                    size,
-                    data,
+                    data: PhyData::new(data),
                     tmms: None,
                     fdev: None,
                     prea: None,
@@ -58,7 +56,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 tokio::spawn(async move {
                     if let Err(e) = prepared_send.dispatch(Some(Duration::from_secs(5))).await {
-                        println!("Transmit Dispatch threw error: {e:?}")
+                        if let Error::Ack(tx_ack::Error::AdjustedTransmitPower(adjusted_power)) = e
+                        {
+                            // Generally, all packet forwarders will reduce output power to appropriate levels.
+                            // Packet forwarder may optionally indicate the actual power used.
+                            println!("Packet sent at adjusted power: {adjusted_power:?}")
+                        } else {
+                            println!("Transmit Dispatch threw error: {e:?}")
+                        }
                     } else {
                         println!("Send complete");
                     }
