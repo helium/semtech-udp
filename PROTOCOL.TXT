@@ -411,9 +411,11 @@ The root object of TX_ACK packet must contain an object named "txpk_ack":
 
 That object contain status information concerning the associated PULL_RESP packet.
 
- Name |  Type  | Function
-:----:|:------:|------------------------------------------------------------------------------
-error | string | Indication about success or type of failure that occured for downlink request.
+ Name |  Type   | Function
+:----:|:-------:|------------------------------------------------------------------------------
+error | string  | Indication about success or type of failure that occured for downlink request.
+warn  | string  | Indication about success and adjustments that were made for downlink request.
+value | integer | (Optional) The adjusted value that was actually used.
 
 The possible values of "error" field are:
 
@@ -425,14 +427,25 @@ The possible values of "error" field are:
  COLLISION_PACKET  | Rejected because there was already a packet programmed in requested timeframe
  COLLISION_BEACON  | Rejected because there was already a beacon planned in requested timeframe
  TX_FREQ           | Rejected because requested frequency is not supported by TX RF chain
- TX_POWER          | Rejected because requested power is not supported by gateway
  GPS_UNLOCKED      | Rejected because GPS is unlocked, so GPS timestamp cannot be used
+
+The possible values of the "warn" field are:
+
+ Value             | Definition
+:-----------------:|---------------------------------------------------------------------
+ TX_POWER          | Requested power is not supported by gateway and was reduced. Adjusted power follows in "value", dBm.
 
 Examples (white-spaces, indentation and newlines added for readability):
 
 ``` json
 {"txpk_ack":{
 	"error":"COLLISION_PACKET"
+}}
+```
+
+``` json
+{"txpk_ack":{
+	"warn":"TX_POWER", "value":27
 }}
 ```
 

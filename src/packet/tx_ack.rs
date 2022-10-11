@@ -50,6 +50,8 @@ impl From<Packet> for super::Packet {
     }
 }
 
+// ERRORS
+//
 // Value             | Definition
 // :-----------------:|---------------------------------------------------------------------
 // NONE              | Packet has been programmed for downlink
@@ -58,14 +60,25 @@ impl From<Packet> for super::Packet {
 // COLLISION_PACKET  | Rejected because there was already a packet programmed in requested timeframe
 // COLLISION_BEACON  | Rejected because there was already a beacon planned in requested timeframe
 // TX_FREQ           | Rejected because requested frequency is not supported by TX RF chain
-// TX_POWER          | Rejected because requested power is not supported by gateway
 // GPS_UNLOCKED      | Rejected because GPS is unlocked, so GPS timestamp cannot be used
+//
+// WARNINGS
+//
+// Value             | Definition
+// :-----------------:|---------------------------------------------------------------------
+// TX_POWER          | Requested transmit power is not supported by gateway and was reduced. Adjusted power follows in "value", dBm.
 //
 // Examples (white-spaces, indentation and newlines added for readability):
 //
 // ``` json
 // {"txpk_ack":{
 // "error":"COLLISION_PACKET"
+// }}
+// ```
+//
+// ``` json
+// {"txpk_ack":{
+// "warn":"TX_POWER", "value": 27
 // }}
 // ```
 
