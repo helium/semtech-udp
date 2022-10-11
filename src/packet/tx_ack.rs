@@ -165,11 +165,21 @@ pub struct Data {
     txpk_ack: TxPkAck,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TxPkAck {
+    tmst: Option<u32>,
+    #[serde(flatten)]
+    result: TxPkAckResult,
+}
+
 impl Default for Data {
     fn default() -> Self {
         Data {
-            txpk_ack: TxPkAck::Error {
-                error: ErrorField::None,
+            txpk_ack: TxPkAck {
+                tmst: None,
+                result: TxPkAckResult::Error {
+                    error: ErrorField::None,
+                },
             },
         }
     }
@@ -177,26 +187,28 @@ impl Default for Data {
 
 impl Data {
     pub fn new_with_error(error: Error) -> Data {
-        let txpk_ack = if let Error::InvalidTransmitPower(Some(v)) = error {
-            TxPkAck::Warn {
+        let result = if let Error::InvalidTransmitPower(Some(v)) = error {
+            TxPkAckResult::Warn {
                 warn: ErrorField::from(Err(error)),
                 value: Some(v),
             }
         } else {
-            TxPkAck::Error {
+            TxPkAckResult::Error {
                 error: ErrorField::from(Err(error)),
             }
         };
-        Data { txpk_ack }
+        Data {
+            txpk_ack: TxPkAck { tmst: None, result },
+        }
     }
 
     pub fn get_result(&self) -> Result<(), Error> {
-        match &self.txpk_ack {
-            TxPkAck::Error { error } => {
+        match &self.txpk_ack.result {
+            TxPkAckResult::Error { error } => {
                 let res: Result<(), Error> = (*error).into();
                 res
             }
-            TxPkAck::Warn { warn, value } => {
+            TxPkAckResult::Warn { warn, value } => {
                 // We need special handling of the ErrorField when warning
                 // otherwise, the into will specify it as InvalidTransmitPower
                 if let ErrorField::TxPower = warn {
@@ -211,7 +223,7 @@ impl Data {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-enum TxPkAck {
+enum TxPkAckResult {
     Error {
         error: ErrorField,
     },
