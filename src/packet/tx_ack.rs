@@ -160,13 +160,13 @@ pub enum Error {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Data {
-    txpk_ack: SubTxPkAck,
+    txpk_ack: TxPkAck,
 }
 
 impl Default for Data {
     fn default() -> Self {
         Data {
-            txpk_ack: SubTxPkAck::Error {
+            txpk_ack: TxPkAck::Error {
                 error: ErrorField::None,
             },
         }
@@ -176,12 +176,12 @@ impl Default for Data {
 impl Data {
     pub fn new_with_error(error: Error) -> Data {
         let txpk_ack = if let Error::InvalidTransmitPower(Some(v)) = error {
-            SubTxPkAck::Warn {
+            TxPkAck::Warn {
                 warn: ErrorField::from(Err(error)),
                 value: Some(v),
             }
         } else {
-            SubTxPkAck::Error {
+            TxPkAck::Error {
                 error: ErrorField::from(Err(error)),
             }
         };
@@ -190,11 +190,11 @@ impl Data {
 
     pub fn get_result(&self) -> Result<(), Error> {
         match &self.txpk_ack {
-            SubTxPkAck::Error { error } => {
+            TxPkAck::Error { error } => {
                 let res: Result<(), Error> = (*error).into();
                 res
             }
-            SubTxPkAck::Warn { warn, value } => {
+            TxPkAck::Warn { warn, value } => {
                 if let ErrorField::TxPower = warn {
                     Err(Error::InvalidTransmitPower(*value))
                 } else {
@@ -207,7 +207,7 @@ impl Data {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-enum SubTxPkAck {
+enum TxPkAck {
     Error {
         error: ErrorField,
     },
