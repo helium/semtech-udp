@@ -1,7 +1,7 @@
 use semtech_udp::pull_resp::PhyData;
 use semtech_udp::{
     pull_resp,
-    server_runtime::{Event, UdpRuntime},
+    server_runtime::{Error, Event, UdpRuntime},
     tx_ack, CodingRate, DataRate, Modulation, StringOrNum,
 };
 use std::net::SocketAddr;
@@ -58,7 +58,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 tokio::spawn(async move {
                     if let Err(e) = prepared_send.dispatch(Some(Duration::from_secs(5))).await {
-                        if let tx_ack::Error::AdjustedTransmitPower(adjusted_power) = e {
+                        if let Error::Ack(tx_ack::Error::AdjustedTransmitPower(
+                            adjusted_power,
+                            _tmst,
+                        )) = e
+                        {
                             // Generally, all packet forwarders will reduce output power to appropriate levels.
                             // Packet forwarder may optionally indicate the actual power used.
                             println!("Packet sent at adjusted power: {adjusted_power:?}")

@@ -56,7 +56,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 tokio::spawn(async move {
                     if let Err(e) = prepared_send.dispatch(Some(Duration::from_secs(5))).await {
-                        if let Error::Ack(tx_ack::Error::AdjustedTransmitPower(adjusted_power)) = e
+                        if let Error::Ack(tx_ack::Error::AdjustedTransmitPower(
+                            adjusted_power,
+                            _tmst,
+                        )) = e
                         {
                             // Generally, all packet forwarders will reduce output power to appropriate levels.
                             // Packet forwarder may optionally indicate the actual power used.
