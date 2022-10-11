@@ -24,7 +24,7 @@ use std::io::{Cursor, Write};
 pub struct Packet {
     pub random_token: u16,
     pub gateway_mac: MacAddress,
-    pub data: TxPkNack,
+    pub data: Data,
 }
 
 impl Packet {
@@ -159,13 +159,13 @@ pub enum Error {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TxPkNack {
+pub struct Data {
     txpk_ack: SubTxPkAck,
 }
 
-impl Default for TxPkNack {
+impl Default for Data {
     fn default() -> Self {
-        TxPkNack {
+        Data {
             txpk_ack: SubTxPkAck::Error {
                 error: ErrorField::None,
             },
@@ -173,8 +173,8 @@ impl Default for TxPkNack {
     }
 }
 
-impl TxPkNack {
-    pub fn new_with_error(error: Error) -> TxPkNack {
+impl Data {
+    pub fn new_with_error(error: Error) -> Data {
         let txpk_ack = if let Error::InvalidTransmitPower(Some(v)) = error {
             SubTxPkAck::Warn {
                 warn: ErrorField::from(Err(error)),
@@ -185,7 +185,7 @@ impl TxPkNack {
                 error: ErrorField::from(Err(error)),
             }
         };
-        TxPkNack { txpk_ack }
+        Data { txpk_ack }
     }
 
     pub fn get_result(&self) -> Result<(), Error> {
@@ -220,7 +220,7 @@ enum SubTxPkAck {
 #[test]
 fn tx_nack_too_late() {
     let json = "{\"txpk_ack\": { \"error\": \"TOO_LATE\"}}";
-    let parsed: TxPkNack = serde_json::from_str(json).expect("Error parsing tx_ack");
+    let parsed: Data = serde_json::from_str(json).expect("Error parsing tx_ack");
     if let Err(Error::TooLate) = parsed.get_result() {
     } else {
         assert!(false);
@@ -230,7 +230,7 @@ fn tx_nack_too_late() {
 #[test]
 fn tx_ack_deser() {
     let json = "{\"txpk_ack\":{\"error\":\"NONE\"}}";
-    let parsed: TxPkNack = serde_json::from_str(json).expect("Error parsing tx_ack");
+    let parsed: Data = serde_json::from_str(json).expect("Error parsing tx_ack");
     if let Err(_) = parsed.get_result() {
         assert!(false);
     }
@@ -239,7 +239,7 @@ fn tx_ack_deser() {
 #[test]
 fn tx_nack_tx_power_legacy() {
     let json = "{ \"txpk_ack\": { \"error\" : \"TX_POWER\"}}";
-    let parsed: TxPkNack = serde_json::from_str(json).expect("Error parsing tx_ack");
+    let parsed: Data = serde_json::from_str(json).expect("Error parsing tx_ack");
     if let Err(Error::InvalidTransmitPower(v)) = parsed.get_result() {
         assert!(v.is_none());
     } else {
@@ -250,7 +250,7 @@ fn tx_nack_tx_power_legacy() {
 #[test]
 fn tx_nack_tx_power_sx1302deser() {
     let json = "{ \"txpk_ack\": { \"warn\" : \"TX_POWER\", \"value\" : 27 }}";
-    let parsed: TxPkNack = serde_json::from_str(json).expect("Error parsing tx_ack");
+    let parsed: Data = serde_json::from_str(json).expect("Error parsing tx_ack");
     if let Err(Error::InvalidTransmitPower(v)) = parsed.get_result() {
         if let Some(v) = v {
             assert_eq!(v, 27)
@@ -264,7 +264,7 @@ fn tx_nack_tx_power_sx1302deser() {
 
 #[test]
 fn tx_nack_tx_power_sx1302_ser() {
-    let invalid_transmit_power = TxPkNack::new_with_error(Error::InvalidTransmitPower(Some(27)));
+    let invalid_transmit_power = Data::new_with_error(Error::InvalidTransmitPower(Some(27)));
     let str = serde_json::to_string(&invalid_transmit_power).expect("serialization error");
     assert_eq!("{\"txpk_ack\":{\"warn\":\"TX_POWER\",\"value\":27}}", str)
 }

@@ -28,7 +28,7 @@ impl Packet {
         tx_ack::Packet {
             gateway_mac,
             random_token: self.random_token,
-            data: tx_ack::TxPkNack::default(),
+            data: tx_ack::Data::default(),
         }
     }
 
@@ -40,7 +40,7 @@ impl Packet {
         tx_ack::Packet {
             gateway_mac,
             random_token: self.random_token,
-            data: super::tx_ack::TxPkNack::new_with_error(error),
+            data: super::tx_ack::Data::new_with_error(error),
         }
     }
 
