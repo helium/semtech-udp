@@ -39,10 +39,7 @@ impl SerializablePacket for Packet {
         write_preamble(&mut w, self.random_token)?;
         w.write_all(&[Identifier::TxAck as u8])?;
         w.write_all(self.gateway_mac.as_bytes())?;
-        // if both fields are null, don't bother serializing the JSON
-        if self.data.txpk_ack.tmst.is_some() || self.data.txpk_ack.result.is_some() {
-            w.write_all(serde_json::to_string(&self.data)?.as_bytes())?;
-        }
+        w.write_all(serde_json::to_string(&self.data)?.as_bytes())?;
         Ok(w.position())
     }
 }
@@ -171,8 +168,8 @@ pub struct Data {
 pub struct TxPkAck {
     #[serde(skip_serializing_if = "Option::is_none")]
     tmst: Option<u32>,
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    result: Option<TxPkAckResult>,
+    #[serde(flatten)]
+    result: TxPkAckResult,
 }
 
 impl Default for Data {
@@ -180,9 +177,9 @@ impl Default for Data {
         Data {
             txpk_ack: TxPkAck {
                 tmst: None,
-                result: Some(TxPkAckResult::Error {
+                result: TxPkAckResult::Error {
                     error: ErrorField::None,
-                }),
+                },
             },
         }
     }
@@ -207,18 +204,14 @@ impl Data {
             )
         };
         Data {
-            txpk_ack: TxPkAck {
-                tmst,
-                result: Some(result),
-            },
+            txpk_ack: TxPkAck { tmst, result },
         }
     }
 
     pub fn get_result(&self) -> Result<Option<u32>, Error> {
         match &self.txpk_ack.result {
-            None => Ok(self.txpk_ack.tmst),
-            Some(TxPkAckResult::Error { error }) => (*error).to_result(self.txpk_ack.tmst),
-            Some(TxPkAckResult::Warn { warn, value }) => {
+            TxPkAckResult::Error { error } => (*error).to_result(self.txpk_ack.tmst),
+            TxPkAckResult::Warn { warn, value } => {
                 // We need special handling of the ErrorField when warning
                 // otherwise, the into will specify it as InvalidTransmitPower
                 if let ErrorField::TxPower = warn {
@@ -266,16 +259,6 @@ fn tx_ack_deser() {
 #[test]
 fn tx_ack_deser_with_tmst() {
     let json = "{\"txpk_ack\":{\"error\":\"NONE\", \"tmst\": 1234}}";
-    let parsed: Data = serde_json::from_str(json).expect("Error parsing tx_ack");
-    match parsed.get_result() {
-        Ok(Some(tmst)) => assert_eq!(1234, tmst),
-        _ => assert!(false),
-    }
-}
-
-#[test]
-fn tx_ack_deser_with_tmst_no_error() {
-    let json = "{\"txpk_ack\":{ \"tmst\": 1234}}";
     let parsed: Data = serde_json::from_str(json).expect("Error parsing tx_ack");
     match parsed.get_result() {
         Ok(Some(tmst)) => assert_eq!(1234, tmst),
