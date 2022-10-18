@@ -12,7 +12,7 @@ Bytes  | Function
  */
 use super::{
     tx_ack, write_preamble, CodingRate, DataRate, Error as PktError, Identifier, MacAddress,
-    Modulation, SerializablePacket, StringOrNum,
+    Modulation, SerializablePacket, Tmst,
 };
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Write};
@@ -89,11 +89,8 @@ impl Data {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TxPk {
-    pub imme: bool, // Send packet immediately (will ignore tmst & time)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tmst: Option<StringOrNum>, // Send packet on a certain timestamp value (will ignore time)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tmms: Option<StringOrNum>, // Send packet at a certain GPS time (GPS synchronization required)
+    #[serde(flatten)]
+    pub time: Time,
     pub freq: f64,        // TX central frequency in MHz (unsigned float, Hz precision)
     pub rfch: u64,        // Concentrator "RF chain" used for TX (unsigned integer)
     pub powe: u64,        // TX output power in dBm (unsigned integer, dBm precision)
@@ -109,6 +106,62 @@ pub struct TxPk {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ncrc: Option<bool>, // If true, disable the CRC of the physical layer (optional)
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Time {
+    imme: bool, // Send packet immediately (will ignore tmst & time)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tmst: Option<Tmst>, // Send packet on a certain timestamp value (will ignore time)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tmms: Option<Tmst>, // Send packet at a certain GPS time (GPS synchronization required)
+}
+
+impl Time {
+    pub fn is_immediate(&self) -> bool {
+        self.imme
+    }
+
+    pub fn tmst(&self) -> Option<u32> {
+        if let Some(Tmst::Tmst(val)) = self.tmst {
+            Some(val)
+        } else {
+            None
+        }
+    }
+
+    pub fn tmms(&self) -> Option<u32> {
+        if let Some(Tmst::Tmst(val)) = self.tmms {
+            Some(val)
+        } else {
+            None
+        }
+    }
+
+    pub fn immediate() -> Time {
+        Time {
+            imme: true,
+            tmst: None,
+            tmms: None,
+        }
+    }
+
+    pub fn by_tmst(tmst: u32) -> Time {
+        Time {
+            imme: false,
+            tmst: Some(Tmst::Tmst(tmst)),
+            tmms: None,
+        }
+    }
+
+    pub fn by_tmms(tmms: u32) -> Time {
+        Time {
+            imme: false,
+            tmst: None,
+            tmms: Some(Tmst::Tmst(tmms)),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PhyData {
     #[serde(with = "crate::packet::types::base64")]
@@ -137,11 +190,11 @@ impl PhyData {
 
 impl TxPk {
     pub fn is_immediate(&self) -> bool {
-        self.imme
+        self.time.imme
     }
 
     pub fn get_tmst(&self) -> Option<u32> {
-        if let Some(StringOrNum::N(tmst)) = self.tmst {
+        if let Some(Tmst::Tmst(tmst)) = self.time.tmst {
             Some(tmst)
         } else {
             None
@@ -155,7 +208,7 @@ impl fmt::Display for TxPk {
         write!(
             f,
             "{}, {:.2} MHz, {:?}, len: {}",
-            if let Some(StringOrNum::N(time)) = self.tmst {
+            if let Some(Tmst::Tmst(time)) = self.time.tmst {
                 format!("@{} us", time)
             } else {
                 "immediately".into()
