@@ -1,7 +1,8 @@
+use semtech_udp::pull_resp::Time;
 use semtech_udp::{
     pull_resp::{self, PhyData},
     server_runtime::{Error, Event, UdpRuntime},
-    tx_ack, Bandwidth, CodingRate, DataRate, MacAddress, Modulation, SpreadingFactor, StringOrNum,
+    tx_ack, Bandwidth, CodingRate, DataRate, MacAddress, Modulation, SpreadingFactor,
 };
 use std::net::SocketAddr;
 use structopt::StructOpt;
@@ -31,11 +32,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             while cli.delay != 0 || first_shot {
                 first_shot = false;
                 let data = vec![0; cli.length];
-                let tmst = StringOrNum::S("immedate".into());
 
                 let txpk = pull_resp::TxPk {
-                    imme: true,
-                    tmst: Some(tmst),
+                    time: Time::immediate(),
                     freq: cli.frequency,
                     rfch: 0,
                     powe: cli.power as u64,
@@ -44,7 +43,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     codr: CodingRate::_4_5,
                     ipol: cli.polarization_inversion,
                     data: PhyData::new(data),
-                    tmms: None,
                     fdev: None,
                     prea: None,
                     ncrc: None,

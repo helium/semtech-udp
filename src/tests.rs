@@ -112,19 +112,14 @@ fn test_push_data_stat() {
     }
 }
 
-use crate::packet::StringOrNum;
-
 #[test]
 fn test_immediate_send() {
     use crate::packet::pull_resp::TxPk;
     let json = "{\"codr\":\"4/5\",\"data\":\"IHLF2EA+n8BFY1vrCU1k/Vg=\",\"datr\":\"SF10BW125\",\"freq\":904.1,\"imme\":true,\"ipol\":false,\"modu\":\"LORA\",\"powe\":27,\"rfch\":0,\"size\":87,\"tmst\":\"immediate\"}";
 
     let txpk: TxPk = serde_json::from_str(json).unwrap();
-    if let Some(StringOrNum::S(_)) = txpk.tmst {
-        assert!(true);
-    } else {
-        assert!(false);
-    }
+    assert!(txpk.time.is_immediate());
+    assert!(txpk.time.tmms().is_none())
 }
 
 #[test]
@@ -141,8 +136,9 @@ fn test_timed_send() {
     let json = "{\"codr\":\"4/5\",\"data\":\"IHLF2EA+n8BFY1vrCU1k/Vg=\",\"datr\":\"SF10BW500\",\"freq\":926.9000244140625,\"imme\":false,\"ipol\":true,\"modu\":\"LORA\",\"powe\":27,\"rfch\":0,\"size\":17,\"tmst\":727050748}";
 
     let txpk: TxPk = serde_json::from_str(json).unwrap();
-    if let Some(StringOrNum::N(_)) = txpk.tmst {
-        assert!(true);
+    assert!(!txpk.time.is_immediate());
+    if let Some(time) = txpk.time.tmst() {
+        assert_eq!(727050748, time);
     } else {
         assert!(false);
     }

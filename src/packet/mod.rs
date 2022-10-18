@@ -93,11 +93,48 @@ fn write_preamble(w: &mut Cursor<&mut [u8]>, token: u16) -> Result {
     Ok(w.write_all(&[PROTOCOL_VERSION, (token >> 8) as u8, token as u8])?)
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
-pub enum StringOrNum {
-    S(String),
-    N(u32),
+pub enum Tmst {
+    Immediate,
+    Tmst(u32),
+}
+use serde::Deserializer;
+
+impl<'de> Deserialize<'de> for Tmst {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Tmst, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        use serde_json::Value;
+        // use the JSON deserialize so as to accept strings or nums
+        let value = Value::deserialize(deserializer)?;
+        if let Value::String(str) = value {
+            if str == "immediate" {
+                Ok(Tmst::Immediate)
+            } else {
+                Err(Error::custom("invalid string for tmst field"))
+            }
+        } else if let Value::Number(num) = value {
+            match num.as_u64() {
+                Some(value) => {
+                    if value < 2_u64.pow(32) {
+                        Ok(Tmst::Tmst(value as u32))
+                    } else {
+                        Err(Error::custom(
+                            "tmst field must be a 32-bit number. it appears to be larger",
+                        ))
+                    }
+                }
+                None => Err(Error::custom(
+                    "when tmst field is a number, it must be an integer",
+                )),
+            }
+        } else {
+            Err(Error::custom("tmst field must be string or number"))
+        }
+    }
 }
 
 pub trait SerializablePacket {
