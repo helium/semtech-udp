@@ -118,7 +118,7 @@ impl From<Result<(), Error>> for ErrorField {
 }
 
 impl ErrorField {
-    fn to_result(&self, tmst: Option<u32>) -> Result<Option<u32>, Error> {
+    fn as_result(&self, tmst: Option<u32>) -> Result<Option<u32>, Error> {
         match self {
             ErrorField::TooEarly => Err(Error::TooEarly),
             ErrorField::CollisionPacket => Err(Error::CollisionPacket),
@@ -210,14 +210,14 @@ impl Data {
 
     pub fn get_result(&self) -> Result<Option<u32>, Error> {
         match &self.txpk_ack.result {
-            TxPkAckResult::Error { error } => (*error).to_result(self.txpk_ack.tmst),
+            TxPkAckResult::Error { error } => (*error).as_result(self.txpk_ack.tmst),
             TxPkAckResult::Warn { warn, value } => {
                 // We need special handling of the ErrorField when warning
                 // otherwise, the into will specify it as InvalidTransmitPower
                 if let ErrorField::TxPower = warn {
                     Err(Error::AdjustedTransmitPower(*value, self.txpk_ack.tmst))
                 } else {
-                    (*warn).to_result(self.txpk_ack.tmst)
+                    (*warn).as_result(self.txpk_ack.tmst)
                 }
             }
         }
