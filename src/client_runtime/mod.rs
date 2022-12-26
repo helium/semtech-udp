@@ -51,7 +51,7 @@ pub enum Event {
 
 // A downlink request is sent to the client and contains the necessary
 // information and channels to create the NACK or ACK
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DownlinkRequest {
     mac: MacAddress,
     pub pull_resp: pull_resp::Packet,

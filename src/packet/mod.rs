@@ -14,7 +14,7 @@ pub use macaddr::MacAddr8 as MacAddress;
 
 const PROTOCOL_VERSION: u8 = 2;
 
-#[derive(Debug, Eq, PartialEq, TryFromPrimitive)]
+#[derive(Debug, Eq, PartialEq, TryFromPrimitive, Clone)]
 #[repr(u8)]
 pub enum Identifier {
     PushData = 0,
