@@ -168,8 +168,8 @@ pub struct Data {
 pub struct TxPkAck {
     #[serde(skip_serializing_if = "Option::is_none")]
     tmst: Option<u32>,
-    #[serde(flatten)]
-    result: TxPkAckResult,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    result: Option<TxPkAckResult>,
 }
 
 impl Default for Data {
@@ -177,9 +177,9 @@ impl Default for Data {
         Data {
             txpk_ack: TxPkAck {
                 tmst: None,
-                result: TxPkAckResult::Error {
+                result: Some(TxPkAckResult::Error {
                     error: ErrorField::None,
-                },
+                }),
             },
         }
     }
@@ -204,14 +204,17 @@ impl Data {
             )
         };
         Data {
-            txpk_ack: TxPkAck { tmst, result },
+            txpk_ack: TxPkAck {
+                tmst,
+                result: Some(result),
+            },
         }
     }
 
     pub fn get_result(&self) -> Result<Option<u32>, Error> {
         match &self.txpk_ack.result {
-            TxPkAckResult::Error { error } => (*error).as_result(self.txpk_ack.tmst),
-            TxPkAckResult::Warn { warn, value } => {
+            Some(TxPkAckResult::Error { error }) => (*error).as_result(self.txpk_ack.tmst),
+            Some(TxPkAckResult::Warn { warn, value }) => {
                 // We need special handling of the ErrorField when warning
                 // otherwise, the into will specify it as InvalidTransmitPower
                 if let ErrorField::TxPower = warn {
@@ -220,6 +223,7 @@ impl Data {
                     (*warn).as_result(self.txpk_ack.tmst)
                 }
             }
+            None => Ok(self.txpk_ack.tmst),
         }
     }
 }
@@ -250,6 +254,24 @@ fn tx_nack_too_late() {
 #[test]
 fn tx_ack_deser() {
     let json = "{\"txpk_ack\":{\"error\":\"NONE\"}}";
+    let parsed: Data = serde_json::from_str(json).expect("Error parsing tx_ack");
+    if let Err(_) = parsed.get_result() {
+        assert!(false);
+    }
+}
+
+#[test]
+fn tx_ack_deser_minimal() {
+    let json = "{\"txpk_ack\":{}}";
+    let parsed: Data = serde_json::from_str(json).expect("Error parsing tx_ack");
+    if let Err(_) = parsed.get_result() {
+        assert!(false);
+    }
+}
+
+#[test]
+fn tx_ack_deser_empty_error() {
+    let json = "{\"txpk_ack\":{\"error\":\"\"}}";
     let parsed: Data = serde_json::from_str(json).expect("Error parsing tx_ack");
     if let Err(_) = parsed.get_result() {
         assert!(false);
