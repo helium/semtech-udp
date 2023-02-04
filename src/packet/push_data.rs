@@ -226,7 +226,7 @@ impl fmt::Display for RxPk {
             self.get_frequency(),
             self.get_datarate(),
             if let Some(rssis) = self.get_signal_rssi() {
-                format!("rssis: {}", rssis)
+                format!("rssis: {rssis}")
             } else {
                 format!("rssic: {}", self.get_channel_rssi())
             },

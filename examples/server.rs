@@ -12,7 +12,7 @@ use structopt::StructOpt;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Opt::from_args();
     let addr = SocketAddr::from(([0, 0, 0, 0], cli.port));
-    println!("Starting server: {}", addr);
+    println!("Starting server: {addr}");
     let mut udp_runtime = UdpRuntime::new(addr).await?;
     println!("Ready for clients");
     loop {
@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("Client disconnected: {mac}, {addr}");
             }
             Event::PacketReceived(rxpk, gateway_mac) => {
-                println!("{:?}", rxpk);
+                println!("{rxpk:?}");
                 let data = vec![1, 2, 3, 4];
                 let tmst = rxpk.get_timestamp() + 1_000_000;
 

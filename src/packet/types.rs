@@ -131,13 +131,13 @@ pub mod data_rate {
 
     impl ToString for Bandwidth {
         fn to_string(&self) -> String {
-            format!("{:?}", self)
+            format!("{self:?}")
         }
     }
 
     impl ToString for SpreadingFactor {
         fn to_string(&self) -> String {
-            format!("{:?}", self)
+            format!("{self:?}")
         }
     }
 

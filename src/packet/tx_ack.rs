@@ -168,7 +168,7 @@ pub struct Data {
 pub struct TxPkAck {
     #[serde(skip_serializing_if = "Option::is_none")]
     tmst: Option<u32>,
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
     result: Option<TxPkAckResult>,
 }
 
@@ -239,6 +239,14 @@ enum TxPkAckResult {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<i32>,
     },
+}
+
+impl Default for TxPkAckResult {
+    fn default() -> Self {
+        TxPkAckResult::Error {
+            error: ErrorField::None,
+        }
+    }
 }
 
 #[test]
