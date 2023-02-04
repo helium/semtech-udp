@@ -30,7 +30,7 @@ impl Packet {
     pub fn parse_downlink(buffer: &[u8]) -> std::result::Result<Down, ParseError> {
         match Self::parse(buffer)? {
             Packet::Down(down) => Ok(down),
-            Packet::Up(up) => Err(ParseError::UnexpectedUplink(up)),
+            Packet::Up(up) => Err(ParseError::UnexpectedUplink(Box::new(up))),
         }
     }
 }

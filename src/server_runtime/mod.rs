@@ -252,7 +252,7 @@ impl UdpRuntime {
             if let Err(e) = udp_rx.run().await {
                 // we panic here because the ony error case here
                 // if we lost the local socket somehow
-                panic!("UdpRx threw error: {:?}", e)
+                panic!("UdpRx threw error: {e:?}")
             }
         });
 
@@ -262,7 +262,7 @@ impl UdpRuntime {
             if let Err(e) = udp_tx.run().await {
                 // we panic here because the ony error case here
                 // if we lost the local socket somehow
-                panic!("UdpTx threw error: {:?}", e)
+                panic!("UdpTx threw error: {e:?}")
             }
         });
 

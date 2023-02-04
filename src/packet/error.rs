@@ -28,5 +28,5 @@ pub enum ParseError {
     #[error("Received downlink when expecting uplinks only")]
     UnexpectedDownlink(Down),
     #[error("Received uplink when expecting downlinks only")]
-    UnexpectedUplink(Up),
+    UnexpectedUplink(Box<Up>),
 }

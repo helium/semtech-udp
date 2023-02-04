@@ -41,7 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Event::DownlinkRequest(downlink_request) => downlink_request.ack().await?,
             Event::UnableToParseUdpFrame(parse_error, _buffer) => {
-                println!("Error parsing UDP frame {}", parse_error)
+                println!("Error parsing UDP frame {parse_error}")
             }
         }
     }

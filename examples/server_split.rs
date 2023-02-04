@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     ncrc: None,
                 };
 
-                println!("Sending: {}", txpk);
+                println!("Sending: {txpk}");
 
                 let prepared_send = client_tx.prepare_downlink(Some(txpk), gateway_mac);
 
@@ -83,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("UDP data: {buf:?}");
             }
             Event::NewClient((mac, addr)) => {
-                println!("New packet forwarder client: {}, {}", mac, addr);
+                println!("New packet forwarder client: {mac}, {addr}");
 
                 // unlock the tx thread by sending it the gateway mac of the
                 // the first client (connection via PULL_DATA frame)
@@ -92,7 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             Event::UpdateClient((mac, addr)) => {
-                println!("Mac existed, but IP updated: {}, {}", mac, addr);
+                println!("Mac existed, but IP updated: {mac}, {addr}");
             }
             Event::PacketReceived(rxpk, addr) => {
                 println!("Packet Receveived from {addr}: {rxpk:?}");
@@ -101,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("Stat Receveived from {addr}: {stat:?}");
             }
             Event::NoClientWithMac(_packet, mac) => {
-                println!("Tried to send to client with unknown MAC: {:?}", mac)
+                println!("Tried to send to client with unknown MAC: {mac:?}")
             }
             Event::ClientDisconnected((mac, addr)) => {
                 println!("Client disconnected: {mac}, {addr}");
