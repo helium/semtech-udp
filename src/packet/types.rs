@@ -27,8 +27,10 @@ pub mod data_rate {
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             let (sf, bw) = if s.len() > 8 {
                 (&s[..4], &s[4..])
-            } else {
+            } else if s.len() > 3 {
                 (&s[..3], &s[3..])
+            } else {
+                return Err(ParseError::InvalidSpreadingFactor);
             };
 
             Ok(DataRate(
@@ -188,6 +190,12 @@ pub mod data_rate {
         fn test_from_str_sf10() {
             let datarate = DataRate::from_str("SF10BW125").unwrap();
             assert_eq!(datarate, DataRate(SpreadingFactor::SF10, Bandwidth::BW125))
+        }
+
+        #[test]
+        fn test_from_invalid_str() {
+            let datarate = DataRate::from_str("12");
+            assert!(datarate.is_err())
         }
 
         #[test]
