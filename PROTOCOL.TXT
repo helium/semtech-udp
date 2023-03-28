@@ -241,7 +241,7 @@ Example (white-spaces, indentation and newlines added for readability):
 	"ackr":100.0,
 	"dwnb":2,
 	"txnb":2,
-    "temp": 23.2
+	"temp":23.2
 }}
 ```
 
