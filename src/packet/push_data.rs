@@ -332,21 +332,21 @@ temp | number | Current temperature in degree celcius (float)
 // the order of this is important as it makes us identical to Semtech
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Stat {
-    time: String,
+    pub time: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    lati: Option<f64>,
+    pub lati: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    long: Option<f64>,
+    pub long: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    alti: Option<i64>,
-    rxnb: u64,
-    rxok: u64,
-    rxfw: u64,
+    pub alti: Option<i64>,
+    pub rxnb: u64,
+    pub rxok: u64,
+    pub rxfw: u64,
     // if there were no upstream datagrams, this field can be null
-    ackr: Option<f64>,
-    dwnb: u64,
-    txnb: u64,
-    temp: Option<f64>,
+    pub ackr: Option<f64>,
+    pub dwnb: u64,
+    pub txnb: u64,
+    pub temp: Option<f64>,
 }
 
 impl SerializablePacket for Packet {
