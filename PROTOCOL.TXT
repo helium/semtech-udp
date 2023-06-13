@@ -225,6 +225,7 @@ That object contains the status of the gateway, with the following fields:
  ackr | number | Percentage of upstream datagrams that were acknowledged
  dwnb | number | Number of downlink datagrams received (unsigned integer)
  txnb | number | Number of packets emitted (unsigned integer)
+ temp | number | Current temperature in degree celcius (float)
 
 Example (white-spaces, indentation and newlines added for readability):
 
@@ -239,7 +240,8 @@ Example (white-spaces, indentation and newlines added for readability):
 	"rxfw":2,
 	"ackr":100.0,
 	"dwnb":2,
-	"txnb":2
+	"txnb":2,
+	"temp":23.2
 }}
 ```
 

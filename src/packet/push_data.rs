@@ -326,6 +326,7 @@ rxfw | number | Number of radio packets forwarded (unsigned integer)
 ackr | number | Percentage of upstream datagrams that were acknowledged
 dwnb | number | Number of downlink datagrams received (unsigned integer)
 txnb | number | Number of packets emitted (unsigned integer)
+temp | number | Current temperature in degree celcius (float)
 */
 
 // the order of this is important as it makes us identical to Semtech
@@ -345,6 +346,7 @@ pub struct Stat {
     ackr: Option<f64>,
     dwnb: u64,
     txnb: u64,
+    temp: Option<f64>,
 }
 
 impl SerializablePacket for Packet {
