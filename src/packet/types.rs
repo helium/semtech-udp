@@ -70,6 +70,8 @@ pub mod data_rate {
 
     #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
     pub enum SpreadingFactor {
+        SF5,
+        SF6,
         SF7,
         SF8,
         SF9,
@@ -82,6 +84,8 @@ pub mod data_rate {
         type Err = ParseError;
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             match s {
+                "SF5" => Ok(SpreadingFactor::SF5),
+                "SF6" => Ok(SpreadingFactor::SF6),
                 "SF7" => Ok(SpreadingFactor::SF7),
                 "SF8" => Ok(SpreadingFactor::SF8),
                 "SF9" => Ok(SpreadingFactor::SF9),
@@ -102,6 +106,8 @@ pub mod data_rate {
     impl SpreadingFactor {
         pub fn to_u8(&self) -> u8 {
             match self {
+                Self::SF5 => 5,
+                Self::SF6 => 6,
                 Self::SF7 => 7,
                 Self::SF8 => 8,
                 Self::SF9 => 9,
