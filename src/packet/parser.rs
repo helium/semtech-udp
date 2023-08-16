@@ -38,7 +38,7 @@ impl Packet {
 }
 
 impl Packet {
-    fn parse(buffer: &[u8]) -> Result<Packet, ParseError> {
+    pub fn parse(buffer: &[u8]) -> Result<Packet, ParseError> {
         if buffer.len() < PREFIX_LEN {
             return Err(ParseError::InvalidPacketLength(buffer.len(), PREFIX_LEN));
         }
