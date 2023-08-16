@@ -1,6 +1,6 @@
 use super::*;
 use crate::tx_ack::Data;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, result::Result};
 
 const PROTOCOL_VERSION_INDEX: usize = 0;
 const IDENTIFIER_INDEX: usize = 3;
@@ -11,7 +11,7 @@ fn random_token(buffer: &[u8]) -> u16 {
     (buffer[1] as u16) << 8 | buffer[2] as u16
 }
 
-pub fn gateway_mac(buffer: &[u8]) -> std::result::Result<MacAddress, ParseError> {
+pub fn gateway_mac(buffer: &[u8]) -> Result<MacAddress, ParseError> {
     if buffer.len() < GATEWAY_MAC_LEN {
         Err(ParseError::InvalidPacketLength(buffer.len(), 8))
     } else {
@@ -21,18 +21,18 @@ pub fn gateway_mac(buffer: &[u8]) -> std::result::Result<MacAddress, ParseError>
     }
 }
 
-pub trait Parser {
-    fn parse(buffer: &[u8]) -> std::result::Result<Packet, ParseError>;
-}
+// pub trait Parser {
+//     fn parse(buffer: &[u8]) ->  Result<Packet, ParseError>;
+// }
 
 impl Packet {
-    pub fn parse_uplink(buffer: &[u8]) -> std::result::Result<Up, ParseError> {
+    pub fn parse_uplink(buffer: &[u8]) -> Result<Up, ParseError> {
         match Self::parse(buffer)? {
             Packet::Up(up) => Ok(up),
             Packet::Down(down) => Err(ParseError::UnexpectedDownlink(down)),
         }
     }
-    pub fn parse_downlink(buffer: &[u8]) -> std::result::Result<Down, ParseError> {
+    pub fn parse_downlink(buffer: &[u8]) -> Result<Down, ParseError> {
         match Self::parse(buffer)? {
             Packet::Down(down) => Ok(down),
             Packet::Up(up) => Err(ParseError::UnexpectedUplink(Box::new(up))),
@@ -40,7 +40,7 @@ impl Packet {
     }
 }
 
-impl Parser for Packet {
+impl Packet {
     fn parse(buffer: &[u8]) -> std::result::Result<Packet, ParseError> {
         if buffer.len() < IDENTIFIER_INDEX + 1 {
             return Err(ParseError::InvalidPacketLength(
@@ -142,7 +142,7 @@ impl Parser for Packet {
 
 // deals with null byte terminated json
 fn terminate(buf: &[u8]) -> usize {
-    if buf.len() == 0 {
+    if buf.is_empty() {
         0
     } else if buf[buf.len() - 1] == 0 {
         buf.len() - 1
