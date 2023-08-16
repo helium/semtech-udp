@@ -5,7 +5,6 @@ use std::{convert::TryFrom, result::Result};
 const PROTOCOL_VERSION_INDEX: usize = 0;
 const IDENTIFIER_INDEX: usize = 3;
 const PREFIX_LEN: usize = IDENTIFIER_INDEX + 1;
-const PACKET_PAYLOAD_START: usize = 8;
 const GATEWAY_MAC_LEN: usize = 8;
 
 fn random_token(buffer: &[u8]) -> u16 {
@@ -69,7 +68,7 @@ impl Packet {
                     Identifier::PushData => {
                         let gateway_mac = gateway_mac(buffer)?;
                         let json_str =
-                            std::str::from_utf8(&buffer[PACKET_PAYLOAD_START..terminate(buffer)])?;
+                            std::str::from_utf8(&buffer[GATEWAY_MAC_LEN..terminate(buffer)])?;
                         let data = serde_json::from_str(json_str).map_err(|json_error| {
                             ParseError::InvalidJson {
                                 identifier: id,
@@ -86,15 +85,13 @@ impl Packet {
                     }
                     Identifier::TxAck => {
                         let gateway_mac = gateway_mac(buffer)?;
-                        let data = if buffer.len() > PACKET_PAYLOAD_START {
+                        let data = if buffer.len() > GATEWAY_MAC_LEN {
                             // guard against some packet forwarders that put a 0 byte as the last byte
-                            if buffer.len() == PACKET_PAYLOAD_START + 1
-                                && buffer[PACKET_PAYLOAD_START] == 0
-                            {
+                            if buffer.len() == GATEWAY_MAC_LEN + 1 && buffer[GATEWAY_MAC_LEN] == 0 {
                                 Data::default()
                             } else {
                                 let json_str = std::str::from_utf8(
-                                    &buffer[PACKET_PAYLOAD_START..terminate(buffer)],
+                                    &buffer[GATEWAY_MAC_LEN..terminate(buffer)],
                                 )?;
                                 serde_json::from_str(json_str).map_err(|json_error| {
                                     ParseError::InvalidJson {
