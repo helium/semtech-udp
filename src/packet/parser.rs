@@ -134,7 +134,7 @@ impl Packet {
     }
 }
 
-// deals with null byte terminated json
+// deals with null byte terminated json and empty
 fn terminate(buf: &[u8]) -> usize {
     if buf.is_empty() {
         0
