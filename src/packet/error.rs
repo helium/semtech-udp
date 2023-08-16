@@ -13,10 +13,12 @@ pub enum Error {
 
 #[derive(Error, Debug)]
 pub enum ParseError {
-    #[error("invalid GWMP version")]
-    InvalidProtocolVersion,
-    #[error("invalid GWMP frame identifier")]
-    InvalidIdentifier,
+    #[error("invalid packet length: {0}. Requires at least {1} bytes")]
+    InvalidPacketLength(usize, usize),
+    #[error("invalid GWMP version: {0}")]
+    InvalidProtocolVersion(u8),
+    #[error("invalid GWMP frame identifier: {0}")]
+    InvalidIdentifier(u8),
     #[error("utf8 error")]
     Utf8(#[from] std::str::Utf8Error),
     #[error("invalid Json string for {identifier} frame: {json_str}. JsonError: {json_error}")]

@@ -5,15 +5,20 @@ use std::convert::TryFrom;
 const PROTOCOL_VERSION_INDEX: usize = 0;
 const IDENTIFIER_INDEX: usize = 3;
 const PACKET_PAYLOAD_START: usize = 8;
+const GATEWAY_MAC_LEN: usize = 8;
 
 fn random_token(buffer: &[u8]) -> u16 {
     (buffer[1] as u16) << 8 | buffer[2] as u16
 }
 
-pub fn gateway_mac(buffer: &[u8]) -> MacAddress {
-    MacAddress::new(
-        buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7],
-    )
+pub fn gateway_mac(buffer: &[u8]) -> std::result::Result<MacAddress, ParseError> {
+    if buffer.len() < GATEWAY_MAC_LEN {
+        Err(ParseError::InvalidPacketLength(buffer.len(), 8))
+    } else {
+        Ok(MacAddress::new(
+            buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7],
+        ))
+    }
 }
 
 pub trait Parser {
@@ -37,19 +42,30 @@ impl Packet {
 
 impl Parser for Packet {
     fn parse(buffer: &[u8]) -> std::result::Result<Packet, ParseError> {
-        if buffer[PROTOCOL_VERSION_INDEX] != PROTOCOL_VERSION {
-            return Err(ParseError::InvalidProtocolVersion);
+        if buffer.len() < IDENTIFIER_INDEX + 1 {
+            return Err(ParseError::InvalidPacketLength(
+                buffer.len(),
+                IDENTIFIER_INDEX + 1,
+            ));
+        }
+
+        let protocol_version = buffer[PROTOCOL_VERSION_INDEX];
+        if protocol_version != PROTOCOL_VERSION {
+            return Err(ParseError::InvalidProtocolVersion(protocol_version));
         };
 
-        match Identifier::try_from(buffer[IDENTIFIER_INDEX]) {
-            Err(_) => Err(ParseError::InvalidIdentifier),
+        let frame_identifier = buffer[IDENTIFIER_INDEX];
+        match Identifier::try_from(frame_identifier) {
+            Err(_) => Err(ParseError::InvalidIdentifier(frame_identifier)),
             Ok(id) => {
+                // the token is before the identifier which we've already done a length check for
                 let random_token = random_token(buffer);
-                let buffer = &buffer[4..];
+                let buffer = &buffer[IDENTIFIER_INDEX + 1..];
+
                 Ok(match id {
                     // up packets
                     Identifier::PullData => {
-                        let gateway_mac = gateway_mac(&buffer[..PACKET_PAYLOAD_START]);
+                        let gateway_mac = gateway_mac(buffer)?;
                         pull_data::Packet {
                             random_token,
                             gateway_mac,
@@ -57,7 +73,7 @@ impl Parser for Packet {
                         .into()
                     }
                     Identifier::PushData => {
-                        let gateway_mac = gateway_mac(&buffer[..PACKET_PAYLOAD_START]);
+                        let gateway_mac = gateway_mac(buffer)?;
                         let json_str =
                             std::str::from_utf8(&buffer[PACKET_PAYLOAD_START..terminate(buffer)])?;
                         let data = serde_json::from_str(json_str).map_err(|json_error| {
@@ -75,7 +91,7 @@ impl Parser for Packet {
                         .into()
                     }
                     Identifier::TxAck => {
-                        let gateway_mac = gateway_mac(&buffer[..PACKET_PAYLOAD_START]);
+                        let gateway_mac = gateway_mac(buffer)?;
                         let data = if buffer.len() > PACKET_PAYLOAD_START {
                             // guard against some packet forwarders that put a 0 byte as the last byte
                             if buffer.len() == PACKET_PAYLOAD_START + 1
@@ -126,7 +142,9 @@ impl Parser for Packet {
 
 // deals with null byte terminated json
 fn terminate(buf: &[u8]) -> usize {
-    if buf[buf.len() - 1] == 0 {
+    if buf.len() == 0 {
+        0
+    } else if buf[buf.len() - 1] == 0 {
         buf.len() - 1
     } else {
         buf.len()
