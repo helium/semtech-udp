@@ -4,6 +4,7 @@ use std::{convert::TryFrom, result::Result};
 
 const PROTOCOL_VERSION_INDEX: usize = 0;
 const IDENTIFIER_INDEX: usize = 3;
+const PREFIX_LEN: usize = IDENTIFIER_INDEX + 1;
 const PACKET_PAYLOAD_START: usize = 8;
 const GATEWAY_MAC_LEN: usize = 8;
 
@@ -21,10 +22,6 @@ pub fn gateway_mac(buffer: &[u8]) -> Result<MacAddress, ParseError> {
     }
 }
 
-// pub trait Parser {
-//     fn parse(buffer: &[u8]) ->  Result<Packet, ParseError>;
-// }
-
 impl Packet {
     pub fn parse_uplink(buffer: &[u8]) -> Result<Up, ParseError> {
         match Self::parse(buffer)? {
@@ -41,12 +38,9 @@ impl Packet {
 }
 
 impl Packet {
-    fn parse(buffer: &[u8]) -> std::result::Result<Packet, ParseError> {
-        if buffer.len() < IDENTIFIER_INDEX + 1 {
-            return Err(ParseError::InvalidPacketLength(
-                buffer.len(),
-                IDENTIFIER_INDEX + 1,
-            ));
+    fn parse(buffer: &[u8]) -> Result<Packet, ParseError> {
+        if buffer.len() < PREFIX_LEN {
+            return Err(ParseError::InvalidPacketLength(buffer.len(), PREFIX_LEN));
         }
 
         let protocol_version = buffer[PROTOCOL_VERSION_INDEX];
@@ -60,7 +54,7 @@ impl Packet {
             Ok(id) => {
                 // the token is before the identifier which we've already done a length check for
                 let random_token = random_token(buffer);
-                let buffer = &buffer[IDENTIFIER_INDEX + 1..];
+                let buffer = &buffer[PREFIX_LEN..];
 
                 Ok(match id {
                     // up packets
