@@ -406,4 +406,15 @@ mod test {
         let parsed: Data = serde_json::from_str(json).expect("Error parsing push_data::Data");
         check_given_snr(parsed, -3.5);
     }
+
+    #[test]
+    fn snr_roundtrip() {
+        let json = "{\"rxpk\":[{\"jver\":1,\"tmst\":682631918,\"chan\":0,\"rfch\":0,\"freq\":865.062500,\"mid\": 0,\"stat\":1,\"modu\":\"LORA\",\"datr\":\"SF12BW125\",\"codr\":\"4/5\",\"rssis\":-95,\"lsnr\":6.8,\"foff\":-1300,\"rssi\":-94,\"size\":20,\"data\":\"QNbPNwABAQANyqD8ngiq26Hk4gs=\"}]}";
+        let parsed: Data = serde_json::from_str(json).expect("Error parsing push_data::Data");
+        check_given_snr(parsed.clone(), 6.8);
+        let serialized = serde_json::to_string(&parsed).expect("Error serializing push_data::Data");
+        let reparsed: Data =
+            serde_json::from_str(&serialized).expect("Error parsing push_data::Data");
+        check_given_snr(reparsed, 6.8);
+    }
 }
