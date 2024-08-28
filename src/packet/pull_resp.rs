@@ -186,6 +186,16 @@ impl PhyData {
         self.size = data.len();
         self.data = data;
     }
+
+    pub fn data(&self) -> &[u8] {
+        self.data.as_ref()
+    }
+
+    pub fn len(
+        &self,
+    ) -> usize {
+        self.size
+    }
 }
 
 impl TxPk {
