@@ -23,6 +23,7 @@ required-features = ["client"]
 [dependencies]
 arrayref = "0"
 base64 = ">=0.21"
+lora-modulation = ">=0.1.5"
 macaddr = "1"
 num_enum = "0"
 rand = "0"

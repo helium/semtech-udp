@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 mod types;
-pub use types::*;
+pub use lora_modulation::{Bandwidth, CodingRate, SpreadingFactor};
+pub use types::{DataRate, Modulation};
 
 mod error;
 pub use error::{Error, ParseError};

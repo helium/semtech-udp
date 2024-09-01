@@ -5,20 +5,34 @@ pub use data_rate::*;
 pub mod data_rate {
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
     use std::cmp::PartialEq;
+    use std::fmt::Display;
     use std::str::FromStr;
     use std::string::ToString;
-    #[derive(Debug, Clone, Default, PartialEq, Eq)]
-    pub struct DataRate(SpreadingFactor, Bandwidth);
+
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    pub struct DataRate(lora_modulation::SpreadingFactor, lora_modulation::Bandwidth);
+
+    impl Default for DataRate {
+        fn default() -> Self {
+            DataRate(
+                lora_modulation::SpreadingFactor::_7,
+                lora_modulation::Bandwidth::_250KHz,
+            )
+        }
+    }
 
     impl DataRate {
-        pub fn new(spreading_factor: SpreadingFactor, bandwidth: Bandwidth) -> DataRate {
-            DataRate(spreading_factor, bandwidth)
+        pub fn new(
+            sf: lora_modulation::SpreadingFactor,
+            bw: lora_modulation::Bandwidth,
+        ) -> DataRate {
+            DataRate(sf, bw)
         }
-        pub fn spreading_factor(&self) -> &SpreadingFactor {
-            &self.0
+        pub fn spreading_factor(&self) -> lora_modulation::SpreadingFactor {
+            self.0
         }
-        pub fn bandwidth(&self) -> &Bandwidth {
-            &self.1
+        pub fn bandwidth(&self) -> lora_modulation::Bandwidth {
+            self.1
         }
     }
 
@@ -34,17 +48,17 @@ pub mod data_rate {
             };
 
             Ok(DataRate(
-                SpreadingFactor::from_str(sf)?,
-                Bandwidth::from_str(bw)?,
+                SmtcSpreadingFactor::from_str(sf)?.into(),
+                SmtcBandwidth::from_str(bw)?.into(),
             ))
         }
     }
 
-    impl ToString for DataRate {
-        fn to_string(&self) -> String {
-            let mut output = self.spreading_factor().to_string();
-            output.push_str(&self.bandwidth().to_string());
-            output
+    impl Display for DataRate {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let smtc_sf: SmtcSpreadingFactor = self.0.into();
+            let smtc_bw: SmtcBandwidth = self.1.into();
+            write!(f, "{smtc_sf}{smtc_bw}")
         }
     }
 
@@ -68,11 +82,11 @@ pub mod data_rate {
         }
     }
 
-    #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
-    pub enum SpreadingFactor {
+    #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
+    /// A local representation of the spreading factor specifically for JSON serde.
+    enum SmtcSpreadingFactor {
         SF5,
         SF6,
-        #[default]
         SF7,
         SF8,
         SF9,
@@ -81,77 +95,130 @@ pub mod data_rate {
         SF12,
     }
 
-    impl FromStr for SpreadingFactor {
+    impl From<SmtcSpreadingFactor> for lora_modulation::SpreadingFactor {
+        fn from(sf: SmtcSpreadingFactor) -> lora_modulation::SpreadingFactor {
+            match sf {
+                SmtcSpreadingFactor::SF5 => lora_modulation::SpreadingFactor::_5,
+                SmtcSpreadingFactor::SF6 => lora_modulation::SpreadingFactor::_6,
+                SmtcSpreadingFactor::SF7 => lora_modulation::SpreadingFactor::_7,
+                SmtcSpreadingFactor::SF8 => lora_modulation::SpreadingFactor::_8,
+                SmtcSpreadingFactor::SF9 => lora_modulation::SpreadingFactor::_9,
+                SmtcSpreadingFactor::SF10 => lora_modulation::SpreadingFactor::_10,
+                SmtcSpreadingFactor::SF11 => lora_modulation::SpreadingFactor::_11,
+                SmtcSpreadingFactor::SF12 => lora_modulation::SpreadingFactor::_12,
+            }
+        }
+    }
+
+    impl From<lora_modulation::SpreadingFactor> for SmtcSpreadingFactor {
+        fn from(sf: lora_modulation::SpreadingFactor) -> SmtcSpreadingFactor {
+            match sf {
+                lora_modulation::SpreadingFactor::_5 => SmtcSpreadingFactor::SF5,
+                lora_modulation::SpreadingFactor::_6 => SmtcSpreadingFactor::SF6,
+                lora_modulation::SpreadingFactor::_7 => SmtcSpreadingFactor::SF7,
+                lora_modulation::SpreadingFactor::_8 => SmtcSpreadingFactor::SF8,
+                lora_modulation::SpreadingFactor::_9 => SmtcSpreadingFactor::SF9,
+                lora_modulation::SpreadingFactor::_10 => SmtcSpreadingFactor::SF10,
+                lora_modulation::SpreadingFactor::_11 => SmtcSpreadingFactor::SF11,
+                lora_modulation::SpreadingFactor::_12 => SmtcSpreadingFactor::SF12,
+            }
+        }
+    }
+
+    impl FromStr for SmtcSpreadingFactor {
         type Err = ParseError;
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             match s {
-                "SF5" => Ok(SpreadingFactor::SF5),
-                "SF6" => Ok(SpreadingFactor::SF6),
-                "SF7" => Ok(SpreadingFactor::SF7),
-                "SF8" => Ok(SpreadingFactor::SF8),
-                "SF9" => Ok(SpreadingFactor::SF9),
-                "SF10" => Ok(SpreadingFactor::SF10),
-                "SF11" => Ok(SpreadingFactor::SF11),
-                "SF12" => Ok(SpreadingFactor::SF12),
+                "SF5" => Ok(SmtcSpreadingFactor::SF5),
+                "SF6" => Ok(SmtcSpreadingFactor::SF6),
+                "SF7" => Ok(SmtcSpreadingFactor::SF7),
+                "SF8" => Ok(SmtcSpreadingFactor::SF8),
+                "SF9" => Ok(SmtcSpreadingFactor::SF9),
+                "SF10" => Ok(SmtcSpreadingFactor::SF10),
+                "SF11" => Ok(SmtcSpreadingFactor::SF11),
+                "SF12" => Ok(SmtcSpreadingFactor::SF12),
                 _ => Err(ParseError::InvalidSpreadingFactor),
             }
         }
     }
 
-    impl SpreadingFactor {
-        pub fn to_u8(&self) -> u8 {
-            match self {
-                Self::SF5 => 5,
-                Self::SF6 => 6,
-                Self::SF7 => 7,
-                Self::SF8 => 8,
-                Self::SF9 => 9,
-                Self::SF10 => 10,
-                Self::SF11 => 11,
-                Self::SF12 => 12,
-            }
-        }
-    }
-
-    #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
-    pub enum Bandwidth {
+    #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
+    /// A local representation of the bandwidth specifically for JSON serde.
+    enum SmtcBandwidth {
+        BW7,
+        BW10,
+        BW15,
+        BW20,
+        BW31,
+        BW41,
+        BW62,
         BW125,
-        #[default]
         BW250,
         BW500,
     }
 
-    impl FromStr for Bandwidth {
+    impl From<SmtcBandwidth> for lora_modulation::Bandwidth {
+        fn from(bw: SmtcBandwidth) -> lora_modulation::Bandwidth {
+            match bw {
+                SmtcBandwidth::BW7 => lora_modulation::Bandwidth::_7KHz,
+                SmtcBandwidth::BW10 => lora_modulation::Bandwidth::_10KHz,
+                SmtcBandwidth::BW15 => lora_modulation::Bandwidth::_15KHz,
+                SmtcBandwidth::BW20 => lora_modulation::Bandwidth::_20KHz,
+                SmtcBandwidth::BW31 => lora_modulation::Bandwidth::_31KHz,
+                SmtcBandwidth::BW41 => lora_modulation::Bandwidth::_41KHz,
+                SmtcBandwidth::BW62 => lora_modulation::Bandwidth::_62KHz,
+                SmtcBandwidth::BW125 => lora_modulation::Bandwidth::_125KHz,
+                SmtcBandwidth::BW250 => lora_modulation::Bandwidth::_250KHz,
+                SmtcBandwidth::BW500 => lora_modulation::Bandwidth::_500KHz,
+            }
+        }
+    }
+
+    impl From<lora_modulation::Bandwidth> for SmtcBandwidth {
+        fn from(bw: lora_modulation::Bandwidth) -> SmtcBandwidth {
+            match bw {
+                lora_modulation::Bandwidth::_7KHz => SmtcBandwidth::BW7,
+                lora_modulation::Bandwidth::_10KHz => SmtcBandwidth::BW10,
+                lora_modulation::Bandwidth::_15KHz => SmtcBandwidth::BW15,
+                lora_modulation::Bandwidth::_20KHz => SmtcBandwidth::BW20,
+                lora_modulation::Bandwidth::_31KHz => SmtcBandwidth::BW31,
+                lora_modulation::Bandwidth::_41KHz => SmtcBandwidth::BW41,
+                lora_modulation::Bandwidth::_62KHz => SmtcBandwidth::BW62,
+                lora_modulation::Bandwidth::_125KHz => SmtcBandwidth::BW125,
+                lora_modulation::Bandwidth::_250KHz => SmtcBandwidth::BW250,
+                lora_modulation::Bandwidth::_500KHz => SmtcBandwidth::BW500,
+            }
+        }
+    }
+
+    impl FromStr for SmtcBandwidth {
         type Err = ParseError;
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             match s {
-                "BW125" => Ok(Bandwidth::BW125),
-                "BW250" => Ok(Bandwidth::BW250),
-                "BW500" => Ok(Bandwidth::BW500),
+                "BW7" => Ok(SmtcBandwidth::BW7),
+                "BW10" => Ok(SmtcBandwidth::BW10),
+                "BW15" => Ok(SmtcBandwidth::BW15),
+                "BW20" => Ok(SmtcBandwidth::BW20),
+                "BW31" => Ok(SmtcBandwidth::BW31),
+                "BW41" => Ok(SmtcBandwidth::BW41),
+                "BW62" => Ok(SmtcBandwidth::BW62),
+                "BW125" => Ok(SmtcBandwidth::BW125),
+                "BW250" => Ok(SmtcBandwidth::BW250),
+                "BW500" => Ok(SmtcBandwidth::BW500),
                 _ => Err(ParseError::InvalidBandwidth),
             }
         }
     }
 
-    impl ToString for Bandwidth {
-        fn to_string(&self) -> String {
-            format!("{self:?}")
+    impl Display for SmtcBandwidth {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{self:?}")
         }
     }
 
-    impl ToString for SpreadingFactor {
-        fn to_string(&self) -> String {
-            format!("{self:?}")
-        }
-    }
-
-    impl Bandwidth {
-        pub fn to_hz(&self) -> u32 {
-            match self {
-                Self::BW125 => 125_000,
-                Self::BW250 => 250_000,
-                Self::BW500 => 500_000,
-            }
+    impl Display for SmtcSpreadingFactor {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{self:?}")
         }
     }
 
@@ -169,23 +236,23 @@ pub mod data_rate {
     mod tests {
         // Note this useful idiom: importing names from outer (for mod tests) scope.
         use super::*;
-
+        use lora_modulation::{Bandwidth, SpreadingFactor};
         #[test]
         fn test_to_string_sf7() {
-            let datarate = DataRate(SpreadingFactor::SF7, Bandwidth::BW500);
+            let datarate = DataRate(SpreadingFactor::_7, Bandwidth::_500KHz);
             assert_eq!(datarate.to_string(), "SF7BW500")
         }
 
         #[test]
         fn test_to_string_sf10() {
-            let datarate = DataRate(SpreadingFactor::SF10, Bandwidth::BW125);
+            let datarate = DataRate(SpreadingFactor::_10, Bandwidth::_125KHz);
             assert_eq!(datarate.to_string(), "SF10BW125")
         }
 
         #[test]
         fn test_from_str_sf10() {
             let datarate = DataRate::from_str("SF10BW125").unwrap();
-            assert_eq!(datarate, DataRate(SpreadingFactor::SF10, Bandwidth::BW125))
+            assert_eq!(datarate, DataRate(SpreadingFactor::_10, Bandwidth::_125KHz))
         }
 
         #[test]
@@ -197,14 +264,15 @@ pub mod data_rate {
         #[test]
         fn test_from_str_sf7() {
             let datarate = DataRate::from_str("SF7BW500").unwrap();
-            assert_eq!(datarate, DataRate(SpreadingFactor::SF7, Bandwidth::BW500))
+            assert_eq!(datarate, DataRate(SpreadingFactor::_7, Bandwidth::_500KHz))
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 #[allow(clippy::upper_case_acronyms)]
-pub enum CodingRate {
+/// A local representation of the coding rate specifically for JSON serde
+enum SmtcCodingRate {
     #[serde(rename(serialize = "4/5", deserialize = "4/5"))]
     _4_5,
     #[serde(rename(serialize = "4/6", deserialize = "4/6"))]
@@ -214,6 +282,39 @@ pub enum CodingRate {
     #[serde(rename(serialize = "4/8", deserialize = "4/8"))]
     _4_8,
     OFF,
+}
+
+pub fn serialize_codr<S>(
+    codr: &Option<lora_modulation::CodingRate>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let inner_cdr = match codr {
+        None => SmtcCodingRate::OFF,
+        Some(lora_modulation::CodingRate::_4_5) => SmtcCodingRate::_4_5,
+        Some(lora_modulation::CodingRate::_4_6) => SmtcCodingRate::_4_6,
+        Some(lora_modulation::CodingRate::_4_7) => SmtcCodingRate::_4_7,
+        Some(lora_modulation::CodingRate::_4_8) => SmtcCodingRate::_4_8,
+    };
+    inner_cdr.serialize(serializer)
+}
+
+pub fn deserialize_codr<'de, D>(
+    deserializer: D,
+) -> Result<Option<lora_modulation::CodingRate>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let inner_cdr = SmtcCodingRate::deserialize(deserializer)?;
+    Ok(match inner_cdr {
+        SmtcCodingRate::OFF => None,
+        SmtcCodingRate::_4_5 => Some(lora_modulation::CodingRate::_4_5),
+        SmtcCodingRate::_4_6 => Some(lora_modulation::CodingRate::_4_6),
+        SmtcCodingRate::_4_7 => Some(lora_modulation::CodingRate::_4_7),
+        SmtcCodingRate::_4_8 => Some(lora_modulation::CodingRate::_4_8),
+    })
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
