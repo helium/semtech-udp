@@ -196,7 +196,6 @@ impl PhyData {
     pub fn data(&self) -> &[u8] {
         self.data.as_ref()
     }
-
     pub fn len(&self) -> usize {
         self.size
     }
