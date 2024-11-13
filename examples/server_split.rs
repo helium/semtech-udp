@@ -39,8 +39,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     rfch: 0,
                     powe: cli.power as u64,
                     modu: Modulation::LORA,
-                    datr: DataRate::new(cli.spreading_factor.clone(), cli.bandwidth.clone()),
-                    codr: CodingRate::_4_5,
+                    datr: DataRate::new(SpreadingFactor::_12, Bandwidth::_125KHz),
+                    codr: Some(CodingRate::_4_5),
                     ipol: cli.polarization_inversion,
                     data: PhyData::new(data),
                     fdev: None,
@@ -139,14 +139,6 @@ pub struct Opt {
     /// Transmit frequency in MHz
     #[structopt(long, default_value = "868.1")]
     frequency: f64,
-
-    /// Spreading Factor (eg: SF12)
-    #[structopt(long, default_value = "SF12")]
-    spreading_factor: SpreadingFactor,
-
-    /// Bandwdith (eg: BW125)
-    #[structopt(long, default_value = "BW125")]
-    bandwidth: Bandwidth,
 
     /// Polarization inversion (set true when sending to devices)
     #[structopt(long)]

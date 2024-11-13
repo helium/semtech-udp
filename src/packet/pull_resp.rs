@@ -11,11 +11,13 @@ Bytes  | Function
 4-end  | JSON object, starting with {, ending with }, see section 6
  */
 use super::{
-    tx_ack, write_preamble, CodingRate, DataRate, Error as PktError, Identifier, MacAddress,
-    Modulation, SerializablePacket, Tmst,
+    tx_ack, types, write_preamble, Error as PktError, Identifier, MacAddress, SerializablePacket,
+    Tmst,
 };
+
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Write};
+use types::{deserialize_codr, serialize_codr, DataRate, Modulation};
 
 #[derive(Debug, Clone)]
 pub struct Packet {
@@ -96,7 +98,11 @@ pub struct TxPk {
     pub powe: u64,        // TX output power in dBm (unsigned integer, dBm precision)
     pub modu: Modulation, // Modulation identifier "LORA" or "FSK"
     pub datr: DataRate,   // LoRa datarate identifier (eg. SF12BW500)
-    pub codr: CodingRate, // LoRa ECC coding rate identifier
+    #[serde(
+        serialize_with = "serialize_codr",
+        deserialize_with = "deserialize_codr"
+    )]
+    pub codr: Option<lora_modulation::CodingRate>, // LoRa ECC coding rate identifier
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fdev: Option<u64>, //FSK frequency deviation (unsigned integer, in Hz)
     pub ipol: bool,       // Lora modulation polarization inversion
@@ -185,6 +191,17 @@ impl PhyData {
     pub fn set(&mut self, data: Vec<u8>) {
         self.size = data.len();
         self.data = data;
+    }
+
+    pub fn data(&self) -> &[u8] {
+        self.data.as_ref()
+    }
+    pub fn len(&self) -> usize {
+        self.size
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
     }
 }
 

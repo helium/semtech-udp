@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Event::PacketReceived(rxpk, gateway_mac) => {
                 println!("{rxpk:?}");
                 let data = vec![1, 2, 3, 4];
-                let tmst = rxpk.get_timestamp() + 1_000_000;
+                let tmst = rxpk.timestamp() + 1_000_000;
 
                 let txpk = pull_resp::TxPk {
                     time: Time::by_tmst(tmst),
@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     powe: 27,
                     modu: Modulation::LORA,
                     datr: DataRate::default(),
-                    codr: CodingRate::_4_5,
+                    codr: Some(CodingRate::_4_5),
                     ipol: true,
                     data: PhyData::new(data),
                     fdev: None,

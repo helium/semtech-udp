@@ -348,15 +348,11 @@ fn tx_nack_tx_power_sx1302_ser() {
 #[test]
 fn null_terminate() {
     let bytes = hex::decode("02904905aa555a00000000007b227478706b5f61636b223a7b227761726e223a2254585f504f574552222c2276616c7565223a32372c22746d7374223a333937353336363839317d7d00").unwrap();
-    println!("{bytes:?}");
-    let frame = crate::packet::Packet::parse(&bytes).unwrap();
-    println!("{frame:?}");
+    let _frame = crate::packet::Packet::parse(&bytes).unwrap();
 }
 
 #[test]
 fn dont_null_terminate() {
     let bytes = hex::decode("02904905aa555a00000000007b227478706b5f61636b223a7b227761726e223a2254585f504f574552222c2276616c7565223a32372c22746d7374223a333937353336363839317d7d").unwrap();
-    println!("{bytes:?}");
-    let frame = crate::packet::Packet::parse(&bytes).unwrap();
-    println!("{frame:?}");
+    let _frame = crate::packet::Packet::parse(&bytes).unwrap();
 }
