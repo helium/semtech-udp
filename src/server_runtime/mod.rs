@@ -17,7 +17,6 @@ pub use error::Error;
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
 const DEFAULT_DISCONNECT_THRESHOLD: u64 = 60;
-const DEFAULT_CACHE_CHECK_FREQ: u64 = 60;
 const MAX_MESSAGE_SIZE: usize = 65535;
 
 #[derive(Debug)]
@@ -63,6 +62,7 @@ pub struct ClientRx {
 struct UdpRx {
     socket_receiver: Arc<UdpSocket>,
     internal_sender: mpsc::Sender<InternalEvent>,
+    cache_check_secs: u64,
 }
 
 // processes Internal Events and Transmit over UDP
@@ -216,7 +216,21 @@ impl UdpRuntime {
         self.rx.recv().await
     }
 
+    /// Create a new UdpRuntime with the default disconnect timeout (60s).
     pub async fn new<A: ToSocketAddrs>(addr: A) -> Result<UdpRuntime> {
+        Self::new_with_disconnect_timeout(addr, Duration::from_secs(DEFAULT_DISCONNECT_THRESHOLD))
+            .await
+    }
+
+    /// Create a new UdpRuntime with a custom disconnect timeout.
+    ///
+    /// The disconnect timeout controls how long the server waits without
+    /// receiving PULL_DATA from a gateway before emitting a
+    /// `ClientDisconnected` event.
+    pub async fn new_with_disconnect_timeout<A: ToSocketAddrs>(
+        addr: A,
+        disconnect_timeout: Duration,
+    ) -> Result<UdpRuntime> {
         let socket = UdpSocket::bind(&addr).await?;
         let socket_receiver = Arc::new(socket);
         let socket_sender = socket_receiver.clone();
@@ -232,9 +246,15 @@ impl UdpRuntime {
             receiver: client_tx_receiver,
         };
 
+        // Scale the cache check frequency to the disconnect timeout,
+        // checking at least once per timeout period but no less than
+        // every second.
+        let cache_check_secs = disconnect_timeout.as_secs().max(1);
+
         let udp_rx = UdpRx {
             socket_receiver,
             internal_sender: udp_tx_sender.clone(),
+            cache_check_secs,
         };
 
         let udp_tx = Internal {
@@ -244,7 +264,7 @@ impl UdpRuntime {
             clients: HashMap::new(),
             downlink_senders: HashMap::new(),
             socket_sender,
-            disconnect_threshold: Some(Duration::from_secs(DEFAULT_DISCONNECT_THRESHOLD)),
+            disconnect_threshold: Some(disconnect_timeout),
         };
 
         // udp_rx reads from the UDP port
@@ -277,10 +297,11 @@ impl UdpRuntime {
 impl UdpRx {
     pub async fn run(self) -> Result {
         let cache_sender = self.internal_sender.clone();
+        let cache_check_secs = self.cache_check_secs;
         let cache_sender = tokio::spawn(async move {
             loop {
                 cache_sender.send(InternalEvent::CheckCache).await?;
-                tokio::time::sleep(Duration::from_secs(DEFAULT_CACHE_CHECK_FREQ)).await;
+                tokio::time::sleep(Duration::from_secs(cache_check_secs)).await;
             }
         });
 
