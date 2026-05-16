@@ -2,6 +2,7 @@ use crate::packet::types::{deserialize_codr, serialize_codr};
 use crate::push_data::CRC;
 use crate::{DataRate, Modulation};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(untagged)]
@@ -52,6 +53,21 @@ pub struct RxPkV1 {
     pub tmst: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time: Option<String>,
+    /// Free-form key/value metadata attached to an rxpk entry.
+    ///
+    /// Not part of the upstream Semtech GWMP spec. Empty by default and
+    /// skipped from serialization when empty, so a default rxpk is
+    /// byte-identical on the wire and the field appears only when populated.
+    ///
+    /// Prior art: ChirpStack carries the same idea as a
+    /// `map<string, string> metadata` field ("Additional gateway meta-data")
+    /// on `UplinkRxInfo`, its equivalent of an rxpk entry:
+    /// <https://github.com/chirpstack/chirpstack/blob/39df55afb40c4842be6f61992daff42fa647cfbc/api/proto/gw/gw.proto#L478-L479>
+    ///
+    /// Helium's packet router populates it with the gateway pubkey, region,
+    /// human-readable name, and (when known) H3 location.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub meta: HashMap<String, String>,
 }
 
 /*

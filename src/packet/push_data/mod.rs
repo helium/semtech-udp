@@ -70,6 +70,7 @@ impl Packet {
             stat: CRC::OK,
             tmst: 12,
             time: None,
+            meta: Default::default(),
         })];
 
         Packet {
